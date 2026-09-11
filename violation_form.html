@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>违纪记录收集表</title>
+<style>
+:root {
+  --primary: #1677FF;
+  --primary-light: #E6F0FF;
+  --primary-dark: #0958D9;
+  --success: #52C41A;
+  --success-dark: #389E0D;
+  --danger: #FF4D4F;
+  --danger-light: #FFF1F0;
+  --orange: #FA8C16;
+  --bg-main: #F0F2F5;
+  --text-1: #1F1F1F;
+  --text-2: #595959;
+  --text-3: #8C8C8C;
+  --border: #E8E8E8;
+  --border-light: #F0F0F0;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); background: var(--bg-main); color: var(--text-1); font-size: 14px; overflow-x: hidden; }
+input, textarea, select, button { font-family: inherit; font-size: inherit; outline: none; border: none; }
+
+#formView { display: block; max-width: 560px; margin: 40px auto; padding: 32px; min-height: calc(100vh - 80px); background: #fff; border-radius: 12px; box-shadow: 0 2px 24px rgba(0,0,0,0.08); }
+.fpv-header { text-align: center; margin-bottom: 24px; }
+.fpv-header h2 { font-size: 20px; font-weight: 700; color: var(--text-1); margin-bottom: 6px; }
+.fpv-header p { font-size: 13px; color: var(--text-3); }
+.fpv-section { margin-bottom: 16px; }
+.fpv-section label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-1); }
+.fpv-section .req { color: var(--danger); }
+.fpv-section select, .fpv-section textarea, .fpv-section input[type=text] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.fpv-section select:focus, .fpv-section textarea:focus { outline: none; border-color: var(--primary); }
+.vi-type-option { text-align: center; padding: 10px 4px; background: var(--bg-main); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+.vi-type-option:hover { background: var(--border-light); }
+.vi-type-option.selected { border-color: var(--danger); background: var(--danger-light); color: var(--danger); font-weight: 600; }
+.fpv-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.fpv-score-row { display: flex; align-items: center; gap: 8px; }
+.fpv-score-row input { text-align: center; font-weight: 700; max-width: 80px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; border: 1px solid var(--border); background: #fff; color: var(--text-1); }
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn-sm { padding: 6px 10px; font-size: 12px; }
+.fpv-upload { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 20px; text-align: center; cursor: pointer; background: var(--bg-main); }
+.fpv-upload:hover { border-color: var(--danger); }
+.fpv-submit { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; border: none; border-radius: var(--radius-sm); background: var(--danger); color: #fff; cursor: pointer; margin-top: 8px; }
+.fpv-submit:hover { background: #CF1322; }
+.fpv-success { text-align: center; padding: 40px 20px; }
+.fpv-success .icon { font-size: 48px; margin-bottom: 12px; }
+.fpv-success h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.fpv-success p { font-size: 13px; color: var(--text-3); }
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 20px; border-radius: var(--radius-sm); font-size: 13px; z-index: 9999; transition: transform 0.25s; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  #formView { margin: 0; padding: 20px 16px; min-height: 100vh; border-radius: 0; box-shadow: none; }
+  .fpv-header h2 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div id="formView"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== Mock Data ==========
+const studentNames = ['张三','李四','王五','赵六','钱七','孙八','周九','吴十','郑十一','王十二','刘十三','陈十四','衞十五','蒋十六','沈十七','韩十八','杨十九','朱二十','秦廿一','尤廿二','许廿三','何廿四','吕廿五','施廿六','张廿七','孔廿八','曹廿九','严三十','华卅一','金卅二','魏卅三','陶卅四','姜卅五','戚卅六','谢卅七','邹卅八','喻卅九','柏四十','水四一','窦四二','章四三','云四四','苏四五','潘四六','葛四七','奚四八','范四九','彭五十','鲁五一','韦五二','昌五三','马五四','苗五五','花五六','方五七','俞五八','尤五九','冯六十'];
+const avatarColors = ['#1677FF','#52C41A','#FA8C16','#FF4D4F','#722ED1','#13C2C2','#EB2F96','#FAAD14'];
+const students = [];
+for (let i = 0; i < 58; i++) {
+  const id = String(i+1).padStart(2,'0');
+  const fullId = '202403' + id;
+  const name = studentNames[i];
+  const dorm = '10' + (Math.floor(i/6)+1);
+  const color = avatarColors[i % avatarColors.length];
+  students.push({ id, fullId, name, dorm, color, violations: [], conduct: { d7:0, d9:0, d11:0, total:100 } });
+}
+
+// ========== Supabase 配置层（可选用云端真正同步）==========
+// 配置存于 localStorage，由 PC 端“Supabase配置”入口写入。
+var SB_URL_KEY = 'smartclass_supabase_url';
+var SB_ANON_KEY = 'smartclass_supabase_anon';
+function sbConfig() {
+  try {
+    // 优先读取分发链接 URL 参数携带的配置（?sbUrl=...&sbKey=...）
+    // 这样班长任意设备扫码/打开链接即能写入云端
+    var q = location.search;
+    if (q) {
+      var p = new URLSearchParams(q);
+      var u = p.get('sbUrl'), k = p.get('sbKey');
+      if (u && k) {
+        u = u.replace(/\/+$/, '');
+        try { localStorage.setItem(SB_URL_KEY, u); localStorage.setItem(SB_ANON_KEY, k); } catch(e){}
+        return { url: u, anon: k };
+      }
+    }
+    return { url: localStorage.getItem(SB_URL_KEY) || '', anon: localStorage.getItem(SB_ANON_KEY) || '' };
+  } catch(e) { return { url: '', anon: '' }; }
+}
+function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
+// 通过 PostgREST 向 Supabase 表插入一条记录（匿名+RLS）
+function sbInsert(table, row) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) { return; }
+  try {
+    fetch(c.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: {
+        'apikey': c.anon,
+        'Authorization': 'Bearer ' + c.anon,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(row)
+    }).catch(function(){});
+  } catch(e) {}
+}
+// 从 Supabase 查询全部记录（默认最新在前）
+function sbFetch(table, cb) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) { if (cb) cb([]); return; }
+  fetch(c.url + '/rest/v1/' + table + '?select=*&order=ts.asc', {
+    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (Array.isArray(d)) cb(d); else cb([]);
+  }).catch(function(){ cb([]); });
+}
+
+// ========== 共享同步层（localStorage，与PC端/手机端原型互通）==========
+// 收集表提交的记录被 "上传" 到模拟云端(sharedStorage)，两个原型读取后合并渲染。
+// 若配置了 Supabase，则同时写入云端数据库，实现真正的跨设备回传。
+var COLLECT_STORAGE_KEY = 'smartclass_violation_collect';
+function loadCollectRecords() {
+  try { return JSON.parse(localStorage.getItem(COLLECT_STORAGE_KEY)) || []; }
+  catch(e) { return []; }
+}
+function saveCollectRecords(records) {
+  try { localStorage.setItem(COLLECT_STORAGE_KEY, JSON.stringify(records)); } catch(e) {}
+}
+function replayCollectRecords() {
+  // 将已上传记录回放到本地学生数据，保证本表单与原型数据一致
+  loadCollectRecords().forEach(function(r) {
+    var s = students.find(function(x){ return x.fullId === r.fullId; });
+    if (!s) return;
+    s.violations.push({ date: r.date, type: r.type, desc: r.desc, score: -r.score, photo: r.photo });
+    s.conduct.total -= r.score;
+    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 += r.score;
+    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
+    else s.conduct.d9 += r.score;
+  });
+}
+replayCollectRecords();
+// 若配置了 Supabase，启动时拉取云端记录合并到本地（保证表单数据最新）
+function replayCloudRecords() {
+  if (!sbEnabled()) return;
+  sbFetch('violation_records', function(rows) {
+    var sList = rows.filter(function(r){ return r.full_id; });
+    sList.forEach(function(r) {
+      var s = students.find(function(x){ return x.fullId === r.full_id; });
+      if (!s) return;
+      s.violations.push({ date: r.vdate, type: r.vtype, desc: r.description, score: -r.score, photo: r.photo });
+      s.conduct.total -= r.score;
+      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 += r.score;
+      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
+      else s.conduct.d9 += r.score;
+    });
+  });
+}
+replayCloudRecords();
+
+// ========== Toast ==========
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+// ========== Form ==========
+var fpvSelectedType = null;
+var fpvScore = 1;
+var fpvPhotoData = null;
+
+var typeOptions = [
+  {key:'晚修手机未交', dim:'violation'},
+  {key:'宿舍手机未交', dim:'violation'},
+  {key:'旷课', dim:'violation'},
+  {key:'更多（自定义）', dim:'custom'}
+];
+
+function renderForm() {
+  document.body.style.overflow = 'auto';
+  var container = document.getElementById('formView');
+
+  var studentOptions = '<option value="">请选择学生...</option>' + students.map(function(s, i) {
+    return '<option value="' + i + '">' + s.name + ' (' + s.fullId + ')</option>';
+  }).join('');
+
+  var typeHtml = typeOptions.map(function(t, i) {
+    return '<div class="vi-type-option" data-idx="' + i + '" onclick="selectType(this, ' + i + ', ' + JSON.stringify(t).replace(/"/g, '&quot;') + ')">' + t.key + '</div>';
+  }).join('');
+
+  container.innerHTML =
+    '<div class="fpv-header"><h2>📋 违纪记录收集表</h2><p>班干部填写违纪情况，提交后自动汇总至学生档案</p></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>1. 选择学生</label><select id="fpvStudent">' + studentOptions + '</select></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>2. 违纪时间</label><input type="datetime-local" id="fpvDate" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-sizing:border-box"></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>3. 选择违纪类型</label><div class="fpv-types" id="fpvTypes">' + typeHtml + '</div>' +
+    '<input type="text" id="fpvCustomInput" placeholder="请输入自定义违纪类型..." style="display:none;margin-top:8px;width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-sizing:border-box"></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>4. 违纪描述</label><textarea id="fpvDesc" rows="3" placeholder="描述违纪具体情况..."></textarea></div>' +
+    '<div class="fpv-section"><label>扣分</label><div class="fpv-score-row"><button class="btn btn-sm" onclick="adjustScore(-1)">−</button><input type="text" id="fpvScore" value="1" readonly><button class="btn btn-sm" onclick="adjustScore(1)">+</button><span style="font-size:12px;color:var(--text-3);margin-left:4px">分</span></div></div>' +
+    '<div class="fpv-section"><label>上传图片佐证（可选）</label><div class="fpv-upload" onclick="document.getElementById(\'fpvPhotoInput\').click()"><div id="fpvUploadPlaceholder"><div style="font-size:36px">📸</div><div style="font-size:13px;color:var(--text-3);margin-top:8px">点击拍照或选择图片</div></div><img id="fpvPhotoPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px"></div><input type="file" id="fpvPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this)"></div>' +
+    '<button class="fpv-submit" onclick="submitForm()">提交</button>';
+
+  fpvSelectedType = null;
+  fpvScore = 1;
+  fpvPhotoData = null;
+}
+
+function selectType(el, idx, typeInfo) {
+  document.querySelectorAll('#fpvTypes .vi-type-option').forEach(function(o) { o.classList.remove('selected'); });
+  el.classList.add('selected');
+  fpvSelectedType = typeInfo;
+  fpvScore = 1;
+  document.getElementById('fpvScore').value = '1';
+  var customInput = document.getElementById('fpvCustomInput');
+  if (customInput) {
+    customInput.style.display = typeInfo.dim === 'custom' ? 'block' : 'none';
+    if (typeInfo.dim !== 'custom') customInput.value = '';
+  }
+}
+
+function adjustScore(delta) {
+  fpvScore = Math.max(1, fpvScore + delta);
+  document.getElementById('fpvScore').value = fpvScore;
+}
+
+function previewPhoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    fpvPhotoData = e.target.result;
+    var preview = document.getElementById('fpvPhotoPreview');
+    var placeholder = document.getElementById('fpvUploadPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitForm() {
+  var studentIdx = document.getElementById('fpvStudent').value;
+  if (!studentIdx && studentIdx !== '0') { showToast('请选择学生'); return; }
+  if (!fpvSelectedType) { showToast('请选择违纪类型'); return; }
+  var s = students[parseInt(studentIdx)];
+  var desc = document.getElementById('fpvDesc').value.trim() || '未填写描述';
+
+  var typeName = fpvSelectedType.key;
+  if (fpvSelectedType.dim === 'custom') {
+    typeName = document.getElementById('fpvCustomInput').value.trim();
+    if (!typeName) { showToast('请输入自定义违纪类型'); return; }
+  }
+  var dateVal = document.getElementById('fpvDate') ? document.getElementById('fpvDate').value : '';
+  var dateStr = dateVal ? dateVal.replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
+  s.violations.push({ date: dateStr, type: typeName, desc: desc, score: -fpvScore, photo: fpvPhotoData });
+  s.conduct.total -= fpvScore;
+  if (typeName.indexOf('晚修') !== -1 || typeName.indexOf('手机') !== -1) s.conduct.d7 += fpvScore;
+  else if (typeName.indexOf('旷课') !== -1) s.conduct.d11 += fpvScore;
+  else s.conduct.d9 += fpvScore;
+
+  // 保存提交记录到共享存储（模拟上传），触发PC/手机原型storage事件同步
+  var records = loadCollectRecords();
+  records.push({
+    fullId: s.fullId,
+    type: typeName,
+    date: dateStr,
+    desc: desc,
+    score: fpvScore,
+    photo: fpvPhotoData,
+    ts: new Date().toISOString()
+  });
+  saveCollectRecords(records);
+  // 通知同源打开的原型有新数据
+  try { window.dispatchEvent(new StorageEvent('storage', { key: COLLECT_STORAGE_KEY, newValue: JSON.stringify(records) })); } catch(e){}
+  // 若配置了 Supabase，则写入云端数据库（真正跨设备回传）
+  if (sbEnabled()) {
+    sbInsert('violation_records', {
+      full_id: s.fullId, name: s.name, vtype: typeName, vdate: dateStr,
+      score: fpvScore, description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
+      device: (navigator.userAgent || '').substring(0, 40)
+    });
+  }
+
+  var container = document.getElementById('formView');
+  container.innerHTML =
+    '<div class="fpv-success"><div class="icon">✅</div><h3>提交成功！</h3><p>' + s.name + ' 的违纪记录已登记' + (sbEnabled() ? '已上传云端' : '') + '</p>' +
+    '<p style="margin-top:16px"><button class="fpv-submit" style="margin-top:16px" onclick="renderForm()">继续填写</button></p></div>';
+}
+
+// Auto-render on load
+document.addEventListener('DOMContentLoaded', renderForm);
+</script>
+</body>
+</html>

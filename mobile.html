@@ -1,0 +1,3675 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>智慧班级管家 - 手机端</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var h = location.hash.replace(/^#/,'');
+  if (h === 'collect' || h === 'conduct') {
+    document.write('<style>.phone-frame{display:none !important}#standaloneFormView{display:block !important;min-height:100vh}body{overflow:auto !important;min-height:100vh}</style>');
+  }
+})();
+</script>
+<style>
+/* ========== Design System ========== */
+:root {
+  --primary: #1677FF;
+  --primary-light: #E6F0FF;
+  --primary-dark: #0958D9;
+  --success: #52C41A;
+  --success-light: #F0FBE6;
+  --success-dark: #389E0D;
+  --warning: #FAAD14;
+  --warning-light: #FFF7E6;
+  --danger: #FF4D4F;
+  --danger-light: #FFF1F0;
+  --danger-dark: #CF1322;
+  --orange: #FA8C16;
+  --orange-light: #FFF7E6;
+  --bg-main: #F5F6F8;
+  --bg-card: #FFFFFF;
+  --text-1: #1A1A1A;
+  --text-2: #595959;
+  --text-3: #999999;
+  --border: #ECECEC;
+  --border-light: #F5F5F5;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow: 0 1px 4px rgba(0,0,0,0.04);
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.06);
+  --tabbar-h: 56px;
+  --topbar-h: 48px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: var(--font); background: var(--bg-main); color: var(--text-1); font-size: 14px; overflow: hidden; }
+a { text-decoration: none; color: inherit; }
+ul { list-style: none; }
+input, textarea, select, button { font-family: inherit; font-size: inherit; outline: none; border: none; background: none; }
+::-webkit-scrollbar { display: none; }
+
+/* ========== Phone Frame ========== */
+.phone-frame {
+  width: 375px;
+  height: 812px;
+  margin: 20px auto;
+  border-radius: 40px;
+  border: 8px solid #1a1a1a;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-main);
+}
+.phone-frame::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 150px; height: 24px;
+  background: #1a1a1a;
+  border-radius: 0 0 16px 16px;
+  z-index: 200;
+}
+.status-bar {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px 0 28px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: #fff;
+  position: relative;
+  z-index: 100;
+}
+.status-bar .sb-right { display: flex; gap: 5px; align-items: center; }
+
+/* ========== App Layout ========== */
+.app-container {
+  height: calc(812px - 24px);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Topbar */
+.topbar {
+  height: var(--topbar-h);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  z-index: 50;
+}
+.topbar-title { font-size: 17px; font-weight: 600; }
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; width: 60px; }
+.topbar-right { justify-content: flex-end; }
+.topbar-btn { font-size: 20px; cursor: pointer; color: var(--text-1); display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; transition: background 0.15s; }
+.topbar-btn:active { background: var(--bg-main); }
+.topbar-back { font-size: 20px; cursor: pointer; color: var(--text-1); display: none; align-items: center; gap: 2px; }
+.topbar-back.show { display: flex; }
+.topbar-back .back-arrow { font-size: 22px; line-height: 1; }
+
+/* Content Area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.page { display: none; padding: 12px; padding-bottom: 80px; }
+.page.active { display: block; }
+
+/* Bottom Tabbar */
+.tabbar {
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  background: #fff;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  padding-bottom: var(--safe-bottom);
+  flex-shrink: 0;
+  z-index: 50;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  color: var(--text-3);
+  position: relative;
+}
+.tab-item.active { color: var(--primary); }
+.tab-item .tab-icon { font-size: 22px; line-height: 1; }
+.tab-item .tab-label { font-size: 10px; line-height: 1; }
+.tab-item .tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 20%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 14px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ========== Common Components ========== */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.card-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title { font-size: 15px; font-weight: 600; }
+.card-body { padding: 0 16px 16px; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 16px 0 10px 12px; display: flex; align-items: center; gap: 6px; }
+.section-title::before { content: ''; width: 3px; height: 14px; background: var(--primary); border-radius: 2px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: opacity 0.15s;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  min-height: 36px;
+}
+.btn:active { opacity: 0.7; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-default { background: #f5f5f5; color: var(--text-1); }
+.btn-outline { background: #fff; border-color: var(--border); color: var(--text-2); }
+.btn-sm { padding: 6px 12px; font-size: 12px; min-height: 32px; }
+.btn-lg { padding: 12px 24px; font-size: 15px; min-height: 44px; width: 100%; }
+.btn-block { width: 100%; }
+
+/* Tags */
+.tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; line-height: 1.5; }
+.tag-blue { background: var(--primary-light); color: var(--primary); }
+.tag-green { background: var(--success-light); color: var(--success-dark); }
+.tag-orange { background: var(--orange-light); color: var(--orange); }
+.tag-red { background: var(--danger-light); color: var(--danger); }
+.tag-gray { background: var(--border-light); color: var(--text-3); }
+
+/* ========== Dashboard ========== */
+.greeting {
+  background: linear-gradient(135deg, #1677FF 0%, #0958D9 100%);
+  padding: 16px 16px 20px;
+  margin: -12px -12px 0;
+  color: #fff;
+}
+.greeting .g-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.greeting .g-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
+.greeting .g-info { flex: 1; }
+.greeting .g-hello { font-size: 16px; font-weight: 600; }
+.greeting .g-sub { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+.greeting .g-date { font-size: 12px; opacity: 0.8; }
+
+.stat-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: -16px; padding: 0 0 4px; position: relative; z-index: 1; }
+.stat-card {
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.stat-card .sc-icon { font-size: 20px; margin-bottom: 6px; }
+.stat-card .sc-label { font-size: 11px; color: var(--text-3); margin-bottom: 2px; }
+.stat-card .sc-value { font-size: 22px; font-weight: 700; }
+.stat-card .sc-unit { font-size: 12px; font-weight: 400; color: var(--text-3); margin-left: 2px; }
+.stat-card .sc-trend { font-size: 10px; margin-top: 4px; }
+.duty-day { border:1px solid var(--border); border-radius:var(--radius-xs); padding:9px 11px; margin-bottom:8px; }
+.duty-day.is-today { border-color: var(--primary); background: var(--primary-light); }
+.duty-day-head { font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.duty-row { display:flex; align-items:flex-start; gap:6px; padding:3px 0; font-size:12px; }
+.duty-role { flex:0 0 92px; color:var(--text-2); font-weight:600; }
+.duty-people { flex:1; color:var(--text-1); line-height:1.5; }
+
+/* Todo */
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.todo-item:last-child { border-bottom: none; }
+.todo-check {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.todo-check.done { background: var(--success); border-color: var(--success); }
+.todo-check.done::after { content: '✓'; color: #fff; font-size: 12px; }
+.todo-content { flex: 1; min-width: 0; }
+.todo-title { font-size: 14px; color: var(--text-1); line-height: 1.4; }
+.todo-item.done .todo-title { color: var(--text-3); text-decoration: line-through; }
+.todo-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.todo-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; flex-shrink: 0; }
+
+.todo-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 4px;
+}
+.todo-add input {
+  flex: 1;
+  background: var(--bg-main);
+  border-radius: var(--radius-xs);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* Leave Items */
+.leave-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.leave-item:last-child { border-bottom: none; }
+.leave-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.leave-student { font-size: 14px; font-weight: 600; }
+.leave-detail { font-size: 12px; color: var(--text-3); line-height: 1.6; }
+.leave-actions { display: flex; gap: 8px; margin-top: 10px; }
+.leave-actions .btn { flex: 1; }
+
+/* Quick Actions */
+.quick-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.qa-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 4px;
+  cursor: pointer;
+}
+.qa-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+.qa-label { font-size: 11px; color: var(--text-2); text-align: center; }
+
+/* ========== Attendance ========== */
+.att-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.att-stat {
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 10px 4px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.att-stat .as-num { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.att-stat .as-label { font-size: 10px; color: var(--text-3); }
+.att-stat.present .as-num { color: var(--success-dark); }
+.att-stat.leave .as-num { color: var(--orange); }
+.att-stat.absent .as-num { color: var(--danger-dark); }
+.att-stat.total .as-num { color: var(--primary); }
+
+.att-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.att-toolbar .btn { flex: 1; min-width: 0; }
+
+.attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.att-btn {
+  height: 72px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  cursor: pointer;
+  transition: transform 0.1s;
+  position: relative;
+  border: 2px solid transparent;
+}
+.att-btn:active { transform: scale(0.96); }
+.att-btn .att-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: #fff;
+  flex-shrink: 0;
+}
+.att-btn .att-text { flex: 1; min-width: 0; }
+.att-btn .att-id { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.att-btn .att-name { font-size: 13px; line-height: 1.2; margin-top: 2px; }
+
+.att-btn.unchecked { background: #EEF2FF; }
+.att-btn.unchecked .att-id { color: #1677FF; }
+.att-btn.unchecked .att-name { color: #5C6B77; }
+.att-btn.unchecked .att-avatar { background: #1677FF; }
+
+.att-btn.present { background: #F0FBE6; }
+.att-btn.present .att-id { color: #389E0D; }
+.att-btn.present .att-name { color: #4D7910; }
+.att-btn.present .att-avatar { background: #389E0D; }
+.att-btn.present::after { content: '✓'; position: absolute; top: 6px; right: 8px; font-size: 14px; color: var(--success); font-weight: 700; }
+
+.att-btn.leave { background: #FFF7E6; }
+.att-btn.leave .att-id { color: #FA8C16; }
+.att-btn.leave .att-name { color: #694928; }
+.att-btn.leave .att-avatar { background: #FA8C16; }
+.att-btn.leave::before { content: '请假'; position: absolute; top: 4px; left: 6px; font-size: 9px; color: var(--orange); background: rgba(250,140,22,0.15); padding: 1px 5px; border-radius: 3px; }
+
+.att-btn.absent { background: #FFF1F0; }
+.att-btn.absent .att-id { color: #CF1322; animation: blink 1s ease-in-out infinite alternate; }
+@keyframes blink { from { opacity: 1; } to { opacity: 0.5; } }
+.att-btn.absent .att-name { color: #780650; }
+.att-btn.absent .att-avatar { background: #CF1322; }
+.att-btn.absent::before { content: '缺勤'; position: absolute; top: 4px; left: 6px; font-size: 9px; color: var(--danger); background: rgba(255,77,79,0.15); padding: 1px 5px; border-radius: 3px; }
+
+/* ========== Conduct ========== */
+.conduct-tabs {
+  display: flex;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  margin-bottom: 12px;
+}
+.conduct-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--text-3);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.conduct-tab.active { background: var(--primary); color: #fff; font-weight: 500; }
+
+/* Conduct - Table Mode (Card-based on mobile) */
+.conduct-card-list { }
+.conduct-card-item {
+  background: #fff;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+.cci-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cci-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.cci-name { font-size: 14px; font-weight: 600; }
+.cci-id { font-size: 11px; color: var(--text-3); }
+.cci-score { margin-left: auto; font-size: 20px; font-weight: 700; }
+.cci-score.good { color: var(--success-dark); }
+.cci-score.warn { color: var(--orange); }
+.cci-score.bad { color: var(--danger); }
+.cci-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cci-dim { display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); border-radius: var(--radius-xs); padding: 6px 10px; }
+.cci-dim .cd-label { font-size: 11px; color: var(--text-3); }
+.cci-dim .cd-val { font-size: 12px; font-weight: 600; }
+
+/* Conduct - Kanban Mode */
+.kanban-chart { height: 200px; }
+.heat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.heat-card { background: #fff; border-radius: var(--radius-sm); padding: 12px; border: 2px solid transparent; }
+.heat-card.alert { border-color: var(--danger); }
+.heat-card .hc-title { font-size: 12px; font-weight: 600; }
+.heat-card .hc-score { font-size: 20px; font-weight: 700; margin: 4px 0; }
+.heat-card .hc-detail { font-size: 10px; color: var(--text-3); }
+
+.info-stream { max-height: 200px; overflow-y: auto; }
+.info-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
+.info-item .ii-time { color: var(--text-3); white-space: nowrap; font-size: 11px; }
+.info-item .ii-content { color: var(--text-2); }
+.info-item .ii-name { font-weight: 600; }
+
+/* Class dropdown menu */
+.class-dropdown { position: absolute; top: 44px; left: 4px; width: 200px; background: #fff; border-radius: var(--radius-sm); box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; overflow: hidden; }
+.cd-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border-light); background: var(--bg-main); }
+.cd-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; transition: background 0.1s; }
+.cd-item:active { background: var(--bg-main); }
+.cd-icon { font-size: 16px; }
+.cd-label { font-size: 13px; flex: 1; }
+.cd-arrow { font-size: 14px; color: var(--text-3); }
+.cd-divider { height: 1px; background: var(--border-light); margin: 0 14px; }
+
+/* ========== Student Archive ========== */
+.st-table-wrap { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); background: #fff; max-height: 320px; overflow-y: auto; }
+.st-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+.st-table th { background: #FAFAFA; padding: 8px 10px; text-align: left; font-weight: 600; color: var(--text-2); border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+.st-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.st-table tr { cursor: pointer; }
+.st-table tr:active { background: var(--bg-main); }
+.st-table tr.active { background: var(--primary-light); }
+.st-avatar-sm { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; vertical-align: middle; }
+.st-photo-sm { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
+
+.st-profile-panel { background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-card); overflow: hidden; margin-top: 12px; }
+.st-profile-photo { width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; background: var(--bg-main); }
+.st-profile-photo .big-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: #fff; }
+.st-profile-photo .big-photo { width: 100%; height: 100%; object-fit: cover; }
+.st-profile-info { padding: 12px 16px; }
+.st-profile-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
+.st-profile-row .pr-label { color: var(--text-3); }
+.st-profile-row .pr-value { font-weight: 500; }
+
+/* Violation record list */
+.violation-list { margin-top: 8px; }
+.violation-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+.violation-item:last-child { border-bottom: none; }
+.vi-date { font-size: 11px; color: var(--text-3); white-space: nowrap; flex-shrink: 0; width: 56px; }
+.vi-content { flex: 1; }
+.vi-type { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.vi-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.vi-score { font-size: 13px; font-weight: 700; color: var(--danger); flex-shrink: 0; }
+.vi-score.bonus { color: var(--success-dark); }
+.empty-state { text-align: center; padding: 20px; color: var(--text-3); font-size: 13px; }
+
+/* Violation type selector */
+.vi-type-option {
+  text-align: center;
+  padding: 10px 4px;
+  background: var(--bg-main);
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+}
+.vi-type-option:active { background: var(--border-light); }
+.vi-type-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+/* Collection form upload */
+.cf-upload-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg-main);
+}
+.cf-upload-area:active { border-color: var(--primary); background: var(--primary-light); }
+.cf-upload-area.has-photo { padding: 8px; border-style: solid; border-color: var(--success); }
+
+/* Student Detail (Bottom Sheet) */
+.bottom-sheet {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  max-height: 85%;
+  overflow-y: auto;
+  z-index: 200;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+.bottom-sheet.show { transform: translateY(0); }
+.bs-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto; }
+.bs-header { display: flex; align-items: center; gap: 12px; padding: 0 20px 16px; }
+.bs-avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: #fff; }
+.bs-photo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.bs-name { font-size: 18px; font-weight: 600; }
+.bs-id { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.bs-close { position: absolute; top: 12px; right: 16px; font-size: 20px; color: var(--text-3); cursor: pointer; }
+.bs-info { padding: 0 20px 20px; }
+.bs-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.bs-row .bs-label { color: var(--text-3); }
+.bs-row .bs-value { font-weight: 500; }
+.bs-actions { display: flex; gap: 8px; padding: 0 20px 24px; }
+
+/* ========== Notice ========== */
+.notice-item {
+  padding: 14px;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+}
+.notice-item .ni-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.notice-item .ni-title { font-size: 14px; font-weight: 600; flex: 1; padding-right: 8px; }
+.notice-item .ni-time { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.notice-item .ni-content { font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
+.notice-item .ni-tags { display: flex; gap: 6px; }
+
+/* ========== Profile ========== */
+.profile-header {
+  background: linear-gradient(135deg, #1677FF 0%, #0958D9 100%);
+  padding: 20px 16px 24px;
+  margin: -12px -12px 0;
+  text-align: center;
+  color: #fff;
+}
+.profile-avatar { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; }
+.profile-name { font-size: 18px; font-weight: 600; }
+.profile-role { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.profile-menu { margin-top: 12px; }
+.pm-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.pm-item:active { background: var(--bg-main); }
+.pm-icon { font-size: 20px; width: 24px; text-align: center; }
+.pm-label { flex: 1; font-size: 14px; }
+.pm-arrow { color: var(--text-3); font-size: 14px; }
+
+/* ========== Modal ========== */
+.modal-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 300;
+  display: none;
+  align-items: flex-end;
+}
+.modal-mask.show { display: flex; }
+.modal-sheet {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-height: 80%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slide-up 0.25s ease;
+}
+@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-close { font-size: 18px; color: var(--text-3); cursor: pointer; padding: 4px; }
+.modal-body { padding: 16px; overflow-y: auto; }
+.modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-light); display: flex; gap: 8px; }
+
+/* Form */
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 13px; color: var(--text-2); margin-bottom: 6px; display: block; }
+.form-label .req { color: var(--danger); }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--bg-main);
+  border-radius: var(--radius-xs);
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
+
+/* Export format */
+.ef-option {
+  padding: 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: all 0.15s;
+}
+.ef-option:active { background: var(--bg-main); }
+.ef-option.selected { border-color: var(--primary); background: var(--primary-light); }
+.ef-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.ef-sample { font-size: 12px; color: var(--text-3); font-family: monospace; }
+.ef-desc { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+/* QR */
+.qr-box { width: 160px; height: 160px; background: var(--bg-main); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+
+/* Crop */
+.crop-area {
+  width: 260px; height: 260px;
+  border-radius: 12px;
+  background: var(--bg-main);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  margin: 0 auto;
+}
+.crop-overlay {
+  position: absolute;
+  width: 180px; height: 180px;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+  border-radius: 50%;
+}
+
+/* Toast */
+.toast {
+  position: absolute;
+  top: 60px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  z-index: 400;
+  display: none;
+  white-space: nowrap;
+}
+.toast.show { display: block; animation: toast-in 0.25s; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Standalone Form Page (for shared links) */
+html.standalone-pending .phone-frame { display: none !important; }
+body.standalone-form { background: var(--bg-main); }
+body.standalone-form .phone-frame, body.standalone-form .modal-mask, body.standalone-form .toast { display: none !important; }
+#standaloneFormView { display: none; }
+body.standalone-form #standaloneFormView { display: block; max-width: 480px; margin: 0 auto; padding: 20px 16px; min-height: calc(100vh - 40px); background: #fff; }
+.sfv-header { text-align: center; margin-bottom: 20px; }
+.sfv-header h2 { font-size: 18px; font-weight: 700; color: var(--text-1); margin-bottom: 4px; }
+.sfv-header p { font-size: 12px; color: var(--text-3); }
+.sfv-section { margin-bottom: 14px; }
+.sfv-section label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text-1); }
+.sfv-section .req { color: var(--danger); }
+.sfv-section select, .sfv-section textarea, .sfv-section input[type=text], .sfv-section input[type=datetime-local] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.sfv-section select:focus, .sfv-section textarea:focus { outline: none; border-color: var(--primary); }
+.sfv-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sfv-score-row { display: flex; align-items: center; gap: 8px; }
+.sfv-score-row input { text-align: center; font-weight: 700; max-width: 60px; }
+.sfv-upload { border: 2px dashed var(--border); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; background: var(--bg-main); }
+.sfv-upload:hover { border-color: var(--primary); }
+.sfv-submit { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; border: none; border-radius: 8px; background: var(--primary); color: #fff; cursor: pointer; }
+.sfv-submit:hover { background: var(--primary-dark); }
+.sfv-success { text-align: center; padding: 40px 20px; }
+.sfv-success .icon { font-size: 48px; margin-bottom: 12px; }
+.sfv-success h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.sfv-success p { font-size: 13px; color: var(--text-3); }
+.vi-type-option { text-align: center; padding: 8px 4px; background: var(--bg-main); border-radius: 8px; font-size: 12px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+.vi-type-option:hover { background: var(--border-light); }
+.vi-type-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+/* FAB */
+.fab {
+  position: absolute;
+  bottom: 72px; right: 16px;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(22,119,255,0.4);
+  cursor: pointer;
+  z-index: 40;
+  transition: transform 0.15s;
+}
+.fab:active { transform: scale(0.9); }
+
+/* Chart container */
+.chart-box { background: #fff; border-radius: var(--radius-sm); padding: 12px; box-shadow: var(--shadow); margin-bottom: 10px; }
+.chart-box .cb-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+
+<!-- Phone Frame -->
+<div class="phone-frame">
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span>9:08</span>
+    <span></span>
+    <div class="sb-right">
+      <span style="font-size:11px">📶</span>
+      <span style="font-size:11px">🔋</span>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- ========== Topbar ========== -->
+    <header class="topbar" id="topbar">
+      <div class="topbar-left" id="topbarLeft">
+        <span class="topbar-back" id="topbarBack" onclick="goBack()">
+          <span class="back-arrow">‹</span>
+        </span>
+        <span class="topbar-btn" id="topbarClassBtn" onclick="toggleClassMenu()">👥</span>
+      </div>
+      <div class="class-dropdown" id="classDropdown" style="display:none">
+        <div class="cd-header">
+          <span style="font-size:13px;font-weight:600">班级管理</span>
+          <span style="font-size:14px;color:var(--text-3);cursor:pointer" onclick="toggleClassMenu()">✕</span>
+        </div>
+        <div class="cd-item" onclick="toggleClassMenu();showClassSettingsSheet()">
+          <span class="cd-icon">⚙️</span>
+          <span class="cd-label">班级信息设置</span>
+          <span class="cd-arrow">›</span>
+        </div>
+        <div class="cd-item" onclick="toggleClassMenu();showRosterUploadSheet()">
+          <span class="cd-icon">📋</span>
+          <span class="cd-label">上传班级名单</span>
+          <span class="cd-arrow">›</span>
+        </div>
+        <div class="cd-divider"></div>
+        <div class="cd-item" onclick="toggleClassMenu();switchPage('students')">
+          <span class="cd-icon">👤</span>
+          <span class="cd-label">查看学生档案</span>
+          <span class="cd-arrow">›</span>
+        </div>
+        <div class="cd-item" onclick="toggleClassMenu();switchPage('attendance')">
+          <span class="cd-icon">✅</span>
+          <span class="cd-label">考勤点名</span>
+          <span class="cd-arrow">›</span>
+        </div>
+      </div>
+      <span class="topbar-title" id="topbarTitle">首页</span>
+      <div class="topbar-right" id="topbarRight">
+        <span class="topbar-btn" onclick="showToast('消息通知')">🔔</span>
+      </div>
+    </header>
+
+    <!-- ========== Content ========== -->
+    <div class="content">
+
+      <!-- ========== Page: Dashboard ========== -->
+      <div class="page active" id="page-home">
+        <div class="greeting">
+          <div class="g-row">
+            <div class="g-avatar">李</div>
+            <div class="g-info">
+              <div class="g-hello">李老师好 👋</div>
+              <div class="g-sub">21级计算机1班 · 58人</div>
+            </div>
+            <div class="g-date">9月8日 周一</div>
+          </div>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stat-cards">
+          <div class="stat-card" onclick="openDutySheet()" style="cursor:pointer">
+            <div class="sc-icon">🧹</div>
+            <div class="sc-label">今日值日生 · <span id="dutyDayTag">待定</span></div>
+            <div class="sc-value" id="dutyCount">—</div>
+            <div class="sc-trend" style="color:var(--text-3)" id="dutyPreview">点击查看/上传值日表</div>
+          </div>
+          <div class="stat-card" id="cwHomeCard" onclick="openConductWeekView()">
+            <div class="sc-icon">⭐</div>
+            <div class="sc-label">本周操行均分<span id="cwHomeClassName" style="display:none"></span></div>
+            <div class="sc-value" id="cwHomeAvg">—<span class="sc-unit">分</span></div>
+            <div class="sc-trend" style="color:var(--text-3)" id="cwHomeWeek">第8周 · 点击查看对比</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-icon">📝</div>
+            <div class="sc-label">待审批请假</div>
+            <div class="sc-value">3<span class="sc-unit">条</span></div>
+            <div class="sc-trend" style="color:var(--orange)">需处理</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-icon">⚠️</div>
+            <div class="sc-label">未填报收集表</div>
+            <div class="sc-value">2<span class="sc-unit">项</span></div>
+            <div class="sc-trend" style="color:var(--danger)">待跟进</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="section-title">快捷操作</div>
+        <div class="card">
+          <div class="card-body" style="padding:8px 8px 12px">
+            <div class="quick-actions">
+              <div class="qa-item" onclick="switchPage('attendance')">
+                <div class="qa-icon" style="background:var(--primary-light);color:var(--primary)">✅</div>
+                <span class="qa-label">考勤点名</span>
+              </div>
+              <div class="qa-item" onclick="switchPage('conduct')">
+                <div class="qa-icon" style="background:var(--success-light);color:var(--success-dark)">📊</div>
+                <span class="qa-label">品德操行</span>
+              </div>
+              <div class="qa-item" onclick="switchPage('students')">
+                <div class="qa-icon" style="background:var(--orange-light);color:var(--orange)">👤</div>
+                <span class="qa-label">学生档案</span>
+              </div>
+              <div class="qa-item" onclick="showNoticeModal()">
+                <div class="qa-icon" style="background:var(--danger-light);color:var(--danger)">📢</div>
+                <span class="qa-label">发通知</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Todo List -->
+        <div class="section-title">今日待办 <span style="font-weight:400;color:var(--text-3);font-size:12px">5项</span></div>
+        <div class="card">
+          <div class="card-body">
+            <div class="todo-item">
+              <div class="todo-check" onclick="toggleTodo(this)"></div>
+              <div class="todo-content">
+                <div class="todo-title">下午3点开班会（通知全班）</div>
+                <div class="todo-meta">提醒 14:50</div>
+              </div>
+              <span class="todo-badge tag tag-red">紧急</span>
+            </div>
+            <div class="todo-item">
+              <div class="todo-check" onclick="toggleTodo(this)"></div>
+              <div class="todo-content">
+                <div class="todo-title">审核张三病假申请</div>
+                <div class="todo-meta">家长电话请假 · 班长代提交</div>
+              </div>
+              <span class="todo-badge tag tag-orange">待审</span>
+            </div>
+            <div class="todo-item">
+              <div class="todo-check" onclick="toggleTodo(this)"></div>
+              <div class="todo-content">
+                <div class="todo-title">下发第8周宿舍卫生评价任务</div>
+                <div class="todo-meta">需分享给宿管班干部</div>
+              </div>
+              <span class="todo-badge tag tag-blue">17:00</span>
+            </div>
+            <div class="todo-item done">
+              <div class="todo-check done" onclick="toggleTodo(this)"></div>
+              <div class="todo-content">
+                <div class="todo-title">升旗仪式集会点名</div>
+                <div class="todo-meta">应到58 实到56</div>
+              </div>
+            </div>
+            <div class="todo-add">
+              <input type="text" placeholder="添加待办..." id="todoInput" onkeydown="if(event.key==='Enter')addTodo()">
+              <button class="btn btn-primary btn-sm" onclick="addTodo()">添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leave Approval -->
+        <div class="section-title">请假审批 <span style="font-weight:400;color:var(--text-3);font-size:12px">3条待审</span></div>
+        <div class="card">
+          <div class="card-body">
+            <div class="leave-item">
+              <div class="leave-row">
+                <div>
+                  <span class="leave-student">张三</span>
+                  <span style="font-size:11px;color:var(--text-3)"> 20240301</span>
+                </div>
+                <span class="tag tag-red">病假</span>
+              </div>
+              <div class="leave-detail">
+                9月8日 14:00 — 9月9日 18:00<br>
+                发烧38.5°C，家长电话请假
+              </div>
+              <div class="leave-actions">
+                <button class="btn btn-success btn-sm" onclick="showToast('已通过 张三 请假')">✓ 通过</button>
+                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
+              </div>
+            </div>
+            <div class="leave-item">
+              <div class="leave-row">
+                <div>
+                  <span class="leave-student">李四</span>
+                  <span style="font-size:11px;color:var(--text-3)"> 20240305</span>
+                </div>
+                <span class="tag tag-blue">事假</span>
+              </div>
+              <div class="leave-detail">
+                9月9日 08:00 — 17:00<br>
+                家中有事，需回家处理
+              </div>
+              <div class="leave-actions">
+                <button class="btn btn-success btn-sm" onclick="showToast('已通过 李四 请假')">✓ 通过</button>
+                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
+              </div>
+            </div>
+            <div class="leave-item">
+              <div class="leave-row">
+                <div>
+                  <span class="leave-student">王五</span>
+                  <span style="font-size:11px;color:var(--text-3)"> 20240312</span>
+                </div>
+                <span class="tag tag-green">公假</span>
+              </div>
+              <div class="leave-detail">
+                9月9日 10:00 — 16:00<br>
+                代表学校参加技能竞赛
+              </div>
+              <div class="leave-actions">
+                <button class="btn btn-success btn-sm" onclick="showToast('已通过 王五 请假')">✓ 通过</button>
+                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== Page: Attendance ========== -->
+      <div class="page" id="page-attendance">
+        <div class="att-stats" id="attStats">
+          <div class="att-stat total"><div class="as-num" id="mAttTotal">58</div><div class="as-label">应到</div></div>
+          <div class="att-stat present"><div class="as-num" id="mAttPresent">0</div><div class="as-label">已核销</div></div>
+          <div class="att-stat leave"><div class="as-num" id="mAttLeave">0</div><div class="as-label">请假</div></div>
+          <div class="att-stat absent"><div class="as-num" id="mAttAbsent">0</div><div class="as-label">缺席</div></div>
+        </div>
+
+        <div class="att-toolbar">
+          <button class="btn btn-outline btn-sm" onclick="showShareModal()">🔗 分享班长</button>
+          <button class="btn btn-outline btn-sm" onclick="showExportAbsentModal()">📋 导出缺席</button>
+          <button class="btn btn-danger btn-sm" onclick="endAttendance()">⏹ 结束</button>
+        </div>
+
+        <div class="attendance-grid" id="mAttendanceGrid"><div class="att-btn unchecked" data-id="01">
+      <div class="att-avatar" style="background:#1677FF">张</div>
+      <div class="att-text">
+        <div class="att-id">01</div>
+        <div class="att-name">张三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="02">
+      <div class="att-avatar" style="background:#52C41A">李</div>
+      <div class="att-text">
+        <div class="att-id">02</div>
+        <div class="att-name">李四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="03">
+      <div class="att-avatar" style="background:#FA8C16">王</div>
+      <div class="att-text">
+        <div class="att-id">03</div>
+        <div class="att-name">王五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="04">
+      <div class="att-avatar" style="background:#FF4D4F">赵</div>
+      <div class="att-text">
+        <div class="att-id">04</div>
+        <div class="att-name">赵六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="05">
+      <div class="att-avatar" style="background:#722ED1">钱</div>
+      <div class="att-text">
+        <div class="att-id">05</div>
+        <div class="att-name">钱七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="06">
+      <div class="att-avatar" style="background:#13C2C2">孙</div>
+      <div class="att-text">
+        <div class="att-id">06</div>
+        <div class="att-name">孙八</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="07">
+      <div class="att-avatar" style="background:#EB2F96">周</div>
+      <div class="att-text">
+        <div class="att-id">07</div>
+        <div class="att-name">周九</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="08">
+      <div class="att-avatar" style="background:#FAAD14">吴</div>
+      <div class="att-text">
+        <div class="att-id">08</div>
+        <div class="att-name">吴十</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="09">
+      <div class="att-avatar" style="background:#1677FF">郑</div>
+      <div class="att-text">
+        <div class="att-id">09</div>
+        <div class="att-name">郑十一</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="10">
+      <div class="att-avatar" style="background:#52C41A">王</div>
+      <div class="att-text">
+        <div class="att-id">10</div>
+        <div class="att-name">王十二</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="11">
+      <div class="att-avatar" style="background:#FA8C16">刘</div>
+      <div class="att-text">
+        <div class="att-id">11</div>
+        <div class="att-name">刘十三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="12">
+      <div class="att-avatar" style="background:#FF4D4F">陈</div>
+      <div class="att-text">
+        <div class="att-id">12</div>
+        <div class="att-name">陈十四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="13">
+      <div class="att-avatar" style="background:#722ED1">卫</div>
+      <div class="att-text">
+        <div class="att-id">13</div>
+        <div class="att-name">卫十五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="14">
+      <div class="att-avatar" style="background:#13C2C2">蒋</div>
+      <div class="att-text">
+        <div class="att-id">14</div>
+        <div class="att-name">蒋十六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="15">
+      <div class="att-avatar" style="background:#EB2F96">沈</div>
+      <div class="att-text">
+        <div class="att-id">15</div>
+        <div class="att-name">沈十七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="16">
+      <div class="att-avatar" style="background:#FAAD14">韩</div>
+      <div class="att-text">
+        <div class="att-id">16</div>
+        <div class="att-name">韩十八</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="17">
+      <div class="att-avatar" style="background:#1677FF">杨</div>
+      <div class="att-text">
+        <div class="att-id">17</div>
+        <div class="att-name">杨十九</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="18">
+      <div class="att-avatar" style="background:#52C41A">朱</div>
+      <div class="att-text">
+        <div class="att-id">18</div>
+        <div class="att-name">朱二十</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="19">
+      <div class="att-avatar" style="background:#FA8C16">秦</div>
+      <div class="att-text">
+        <div class="att-id">19</div>
+        <div class="att-name">秦廿一</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="20">
+      <div class="att-avatar" style="background:#FF4D4F">尤</div>
+      <div class="att-text">
+        <div class="att-id">20</div>
+        <div class="att-name">尤廿二</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="21">
+      <div class="att-avatar" style="background:#722ED1">许</div>
+      <div class="att-text">
+        <div class="att-id">21</div>
+        <div class="att-name">许廿三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="22">
+      <div class="att-avatar" style="background:#13C2C2">何</div>
+      <div class="att-text">
+        <div class="att-id">22</div>
+        <div class="att-name">何廿四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="23">
+      <div class="att-avatar" style="background:#EB2F96">吕</div>
+      <div class="att-text">
+        <div class="att-id">23</div>
+        <div class="att-name">吕廿五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="24">
+      <div class="att-avatar" style="background:#FAAD14">施</div>
+      <div class="att-text">
+        <div class="att-id">24</div>
+        <div class="att-name">施廿六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="25">
+      <div class="att-avatar" style="background:#1677FF">张</div>
+      <div class="att-text">
+        <div class="att-id">25</div>
+        <div class="att-name">张廿七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="26">
+      <div class="att-avatar" style="background:#52C41A">孔</div>
+      <div class="att-text">
+        <div class="att-id">26</div>
+        <div class="att-name">孔廿八</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="27">
+      <div class="att-avatar" style="background:#FA8C16">曹</div>
+      <div class="att-text">
+        <div class="att-id">27</div>
+        <div class="att-name">曹廿九</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="28">
+      <div class="att-avatar" style="background:#FF4D4F">严</div>
+      <div class="att-text">
+        <div class="att-id">28</div>
+        <div class="att-name">严三十</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="29">
+      <div class="att-avatar" style="background:#722ED1">华</div>
+      <div class="att-text">
+        <div class="att-id">29</div>
+        <div class="att-name">华卅一</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="30">
+      <div class="att-avatar" style="background:#13C2C2">金</div>
+      <div class="att-text">
+        <div class="att-id">30</div>
+        <div class="att-name">金卅二</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="31">
+      <div class="att-avatar" style="background:#EB2F96">魏</div>
+      <div class="att-text">
+        <div class="att-id">31</div>
+        <div class="att-name">魏卅三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="32">
+      <div class="att-avatar" style="background:#FAAD14">陶</div>
+      <div class="att-text">
+        <div class="att-id">32</div>
+        <div class="att-name">陶卅四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="33">
+      <div class="att-avatar" style="background:#1677FF">姜</div>
+      <div class="att-text">
+        <div class="att-id">33</div>
+        <div class="att-name">姜卅五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="34">
+      <div class="att-avatar" style="background:#52C41A">戚</div>
+      <div class="att-text">
+        <div class="att-id">34</div>
+        <div class="att-name">戚卅六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="35">
+      <div class="att-avatar" style="background:#FA8C16">谢</div>
+      <div class="att-text">
+        <div class="att-id">35</div>
+        <div class="att-name">谢卅七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="36">
+      <div class="att-avatar" style="background:#FF4D4F">邹</div>
+      <div class="att-text">
+        <div class="att-id">36</div>
+        <div class="att-name">邹卅八</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="37">
+      <div class="att-avatar" style="background:#722ED1">喻</div>
+      <div class="att-text">
+        <div class="att-id">37</div>
+        <div class="att-name">喻卅九</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="38">
+      <div class="att-avatar" style="background:#13C2C2">柏</div>
+      <div class="att-text">
+        <div class="att-id">38</div>
+        <div class="att-name">柏四十</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="39">
+      <div class="att-avatar" style="background:#EB2F96">水</div>
+      <div class="att-text">
+        <div class="att-id">39</div>
+        <div class="att-name">水四一</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="40">
+      <div class="att-avatar" style="background:#FAAD14">窦</div>
+      <div class="att-text">
+        <div class="att-id">40</div>
+        <div class="att-name">窦四二</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="41">
+      <div class="att-avatar" style="background:#1677FF">章</div>
+      <div class="att-text">
+        <div class="att-id">41</div>
+        <div class="att-name">章四三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="42">
+      <div class="att-avatar" style="background:#52C41A">云</div>
+      <div class="att-text">
+        <div class="att-id">42</div>
+        <div class="att-name">云四四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="43">
+      <div class="att-avatar" style="background:#FA8C16">苏</div>
+      <div class="att-text">
+        <div class="att-id">43</div>
+        <div class="att-name">苏四五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="44">
+      <div class="att-avatar" style="background:#FF4D4F">潘</div>
+      <div class="att-text">
+        <div class="att-id">44</div>
+        <div class="att-name">潘四六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="45">
+      <div class="att-avatar" style="background:#722ED1">葛</div>
+      <div class="att-text">
+        <div class="att-id">45</div>
+        <div class="att-name">葛四七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="46">
+      <div class="att-avatar" style="background:#13C2C2">奚</div>
+      <div class="att-text">
+        <div class="att-id">46</div>
+        <div class="att-name">奚四八</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="47">
+      <div class="att-avatar" style="background:#EB2F96">范</div>
+      <div class="att-text">
+        <div class="att-id">47</div>
+        <div class="att-name">范四九</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="48">
+      <div class="att-avatar" style="background:#FAAD14">彭</div>
+      <div class="att-text">
+        <div class="att-id">48</div>
+        <div class="att-name">彭五十</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="49">
+      <div class="att-avatar" style="background:#1677FF">鲁</div>
+      <div class="att-text">
+        <div class="att-id">49</div>
+        <div class="att-name">鲁五一</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="50">
+      <div class="att-avatar" style="background:#52C41A">韦</div>
+      <div class="att-text">
+        <div class="att-id">50</div>
+        <div class="att-name">韦五二</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="51">
+      <div class="att-avatar" style="background:#FA8C16">昌</div>
+      <div class="att-text">
+        <div class="att-id">51</div>
+        <div class="att-name">昌五三</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="52">
+      <div class="att-avatar" style="background:#FF4D4F">马</div>
+      <div class="att-text">
+        <div class="att-id">52</div>
+        <div class="att-name">马五四</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="53">
+      <div class="att-avatar" style="background:#722ED1">苗</div>
+      <div class="att-text">
+        <div class="att-id">53</div>
+        <div class="att-name">苗五五</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="54">
+      <div class="att-avatar" style="background:#13C2C2">花</div>
+      <div class="att-text">
+        <div class="att-id">54</div>
+        <div class="att-name">花五六</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="55">
+      <div class="att-avatar" style="background:#EB2F96">方</div>
+      <div class="att-text">
+        <div class="att-id">55</div>
+        <div class="att-name">方五七</div>
+      </div>
+    </div><div class="att-btn unchecked" data-id="56">
+      <div class="att-avatar" style="background:#FAAD14">俞</div>
+      <div class="att-text">
+        <div class="att-id">56</div>
+        <div class="att-name">俞五八</div>
+      </div>
+    </div></div>
+
+        <div style="margin-top:16px;display:flex;gap:8px">
+          <button class="btn btn-primary btn-lg" onclick="endAttendance()" style="flex:1">⏹ 结束点名</button>
+          <button class="btn btn-default btn-lg" onclick="resetAttendance()" style="width:80px">↻</button>
+        </div>
+      </div>
+
+      <!-- ========== Page: Conduct ========== -->
+      <div class="page" id="page-conduct">
+        <div class="conduct-tabs">
+          <div class="conduct-tab" onclick="switchConductMode('table')">📋 表格</div>
+          <div class="conduct-tab active" onclick="switchConductMode('kanban')">📊 看板</div>
+        </div>
+
+        <!-- Week selector -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:13px;color:var(--text-2)">周次</span>
+          <select class="form-select" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;">
+            <option>第8周（本周）</option>
+            <option>第7周</option>
+            <option>第6周</option>
+          </select>
+        </div>
+
+        <!-- Table Mode -->
+        <div id="conductTableMode" style="display: none;">
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="btn btn-outline btn-sm" style="flex:1">⬇ 下载模板</button>
+            <button class="btn btn-outline btn-sm" style="flex:1">⬆ 上传模板</button>
+          </div>
+          <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="openConductCollect()">📤 收集表链接</button>
+          <div class="conduct-card-list" id="conductCardList"></div>
+        </div>
+
+        <!-- Kanban Mode -->
+        <div id="conductKanbanMode" style="">
+          <div class="section-title" style="margin-top:0">扣分分布 <span style="font-size:11px;color:var(--text-3);font-weight:400">点击柱子下钻</span></div>
+          <div class="chart-box">
+            <div class="cb-title">班级扣分分布<span style="font-size:11px;color:var(--text-3)">本周</span></div>
+            <div class="kanban-chart" id="mDeductChart" _echarts_instance_="ec_1788870386731" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative;"><div style="position: relative; width: 311px; height: 200px; padding: 0px; margin: 0px; border-width: 0px; cursor: default;"><canvas data-zr-dom-id="zr_0" width="466" height="300" style="position: absolute; left: 0px; top: 0px; width: 311px; height: 200px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class="" style="position: absolute; display: block; border-style: solid; white-space: nowrap; z-index: 9999999; box-shadow: rgba(0, 0, 0, 0.2) 1px 2px 10px; transition: opacity 0.2s cubic-bezier(0.23, 1, 0.32, 1), visibility 0.2s cubic-bezier(0.23, 1, 0.32, 1), transform 0.4s cubic-bezier(0.23, 1, 0.32, 1); background-color: rgb(255, 255, 255); border-width: 1px; border-radius: 4px; color: rgb(102, 102, 102); font: 14px / 21px &quot;Microsoft YaHei&quot;; padding: 10px; top: 0px; left: 0px; transform: translate3d(83px, 110px, 0px); border-color: rgb(255, 255, 255); pointer-events: none; visibility: hidden; opacity: 0;">宿舍卫生: 扣40分</div></div>
+          </div>
+
+          <div class="section-title">宿舍热力预警</div>
+          <div class="heat-grid" id="mHeatGrid"><div class="heat-card"><div class="hc-title">宿舍 101</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 102</div><div class="hc-score" style="color:var(--success-dark)">9.2</div><div class="hc-detail">6人 · 均扣0.8分</div></div><div class="heat-card"><div class="hc-title">宿舍 103</div><div class="hc-score" style="color:var(--success-dark)">8.5</div><div class="hc-detail">6人 · 均扣1.5分</div></div><div class="heat-card"><div class="hc-title">宿舍 104</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 105</div><div class="hc-score" style="color:var(--success-dark)">8.7</div><div class="hc-detail">6人 · 均扣1.3分</div></div><div class="heat-card"><div class="hc-title">宿舍 106</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 107</div><div class="hc-score" style="color:var(--success-dark)">10.0</div><div class="hc-detail">6人 · 均扣0.0分</div></div><div class="heat-card"><div class="hc-title">宿舍 108</div><div class="hc-score" style="color:var(--success-dark)">9.0</div><div class="hc-detail">6人 · 均扣1.0分</div></div><div class="heat-card"><div class="hc-title">宿舍 109</div><div class="hc-score" style="color:var(--success-dark)">9.3</div><div class="hc-detail">6人 · 均扣0.7分</div></div><div class="heat-card"><div class="hc-title">宿舍 1010</div><div class="hc-score" style="color:var(--success-dark)">8.8</div><div class="hc-detail">4人 · 均扣1.3分</div></div></div>
+
+          <div class="section-title">动态信息流</div>
+          <div class="card">
+            <div class="card-body" style="padding:0 16px">
+              <div class="info-stream" id="mInfoStream"><div class="info-item"><span class="ii-time">14:32</span><span class="ii-content"><span class="ii-name">张三</span> 宿舍/手机扣 <span style="color:var(--danger);font-weight:600">1分</span></span></div><div class="info-item"><span class="ii-time">14:28</span><span class="ii-content"><span class="ii-name">李四</span> 课堂/作业扣 <span style="color:var(--danger);font-weight:600">2分</span></span></div><div class="info-item"><span class="ii-time">14:20</span><span class="ii-content"><span class="ii-name">王五</span> 晚修纪律扣 <span style="color:var(--danger);font-weight:600">1分</span></span></div><div class="info-item"><span class="ii-time">14:15</span><span class="ii-content"><span class="ii-name">赵六</span> 出勤/仪容扣 <span style="color:var(--danger);font-weight:600">1分</span></span></div><div class="info-item"><span class="ii-time">14:08</span><span class="ii-content"><span class="ii-name">钱七</span> 班干部加分 <span style="color:var(--danger);font-weight:600">+2分</span></span></div><div class="info-item"><span class="ii-time">13:55</span><span class="ii-content"><span class="ii-name">孙八</span> 班级卫生扣 <span style="color:var(--danger);font-weight:600">3分</span></span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== Page: Students ========== -->
+      <div class="page" id="page-students">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="text" class="form-input" placeholder="搜索学号/姓名..." style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="showPhotoUploadModal()">📷 上传</button>
+        </div>
+        <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="openViolationCollect()">🔗 违纪记录收集表（分享链接）</button>
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+          <span class="tag tag-blue" style="cursor:pointer">全部 58</span>
+          <span class="tag tag-gray" style="cursor:pointer">已上传照片 15</span>
+          <span class="tag tag-gray" style="cursor:pointer">未上传 43</span>
+          <span class="tag tag-gray" style="cursor:pointer">有违纪记录 21</span>
+        </div>
+        <div class="st-table-wrap">
+          <table class="st-table" id="mStudentTable">
+            <thead>
+              <tr>
+                <th>照片</th>
+                <th>学号</th>
+                <th>姓名</th>
+                <th>性别</th>
+                <th>宿舍</th>
+                <th>违纪</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="mStudentTableBody"></tbody>
+          </table>
+        </div>
+        <div class="st-profile-panel" id="mProfilePanel"></div>
+      </div>
+
+      <!-- ========== Page: Notice ========== -->
+      <div class="page" id="page-notice">
+        <div class="notice-item">
+          <div class="ni-header">
+            <span class="ni-title">关于本周五班会调整的通知</span>
+            <span class="ni-time">9月8日</span>
+          </div>
+          <div class="ni-content">因教学楼维护，本周五班会调整至下午3点在201教室进行，请全体同学准时参加。</div>
+          <div class="ni-tags">
+            <span class="tag tag-green">已读 42</span>
+            <span class="tag tag-orange">未读 16</span>
+          </div>
+        </div>
+        <div class="notice-item">
+          <div class="ni-header">
+            <span class="ni-title">第8周班级卫生检查通知</span>
+            <span class="ni-time">9月7日</span>
+          </div>
+          <div class="ni-content">本周四下午进行宿舍卫生大检查，请各宿舍提前做好清洁工作。评分结果将录入操行系统。</div>
+          <div class="ni-tags">
+            <span class="tag tag-green">已读 58</span>
+          </div>
+        </div>
+        <div class="notice-item">
+          <div class="ni-header">
+            <span class="ni-title">技能竞赛报名通知</span>
+            <span class="ni-time">9月5日</span>
+          </div>
+          <div class="ni-content">学校将于9月20日举办专业技能竞赛，有意参加的同学请在9月15日前向班长报名。</div>
+          <div class="ni-tags">
+            <span class="tag tag-green">已读 35</span>
+            <span class="tag tag-orange">未读 23</span>
+          </div>
+        </div>
+        <div class="notice-item">
+          <div class="ni-header">
+            <span class="ni-title">秋季运动会报名通知</span>
+            <span class="ni-time">9月3日</span>
+          </div>
+          <div class="ni-content">学校秋季运动会将于10月中旬举行，请同学们积极报名参加各项比赛。</div>
+          <div class="ni-tags">
+            <span class="tag tag-green">已读 58</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== Page: Profile ========== -->
+      <div class="page" id="page-profile">
+        <div class="profile-header">
+          <div class="profile-avatar">李</div>
+          <div class="profile-name">李老师</div>
+          <div class="profile-role">班主任 · 21级计算机1班</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:-16px;padding:0 4px;position:relative;z-index:1">
+          <div class="card" style="text-align:center;padding:12px 0;margin-bottom:0">
+            <div style="font-size:20px;font-weight:700;color:var(--primary)">58</div>
+            <div style="font-size:11px;color:var(--text-3)">班级人数</div>
+          </div>
+          <div class="card" style="text-align:center;padding:12px 0;margin-bottom:0">
+            <div style="font-size:20px;font-weight:700;color:var(--success-dark)">8</div>
+            <div style="font-size:11px;color:var(--text-3)">管理周数</div>
+          </div>
+          <div class="card" style="text-align:center;padding:12px 0;margin-bottom:0">
+            <div style="font-size:20px;font-weight:700;color:var(--orange)">12</div>
+            <div style="font-size:11px;color:var(--text-3)">本月通知</div>
+          </div>
+        </div>
+
+        <div class="section-title">数据导出</div>
+        <div class="profile-menu">
+          <div class="pm-item" onclick="showToast('导出考勤记录')">
+            <span class="pm-icon">✅</span>
+            <span class="pm-label">考勤记录导出</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showToast('导出操行分报表')">
+            <span class="pm-icon">📊</span>
+            <span class="pm-label">操行分报表导出</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showToast('导出请假记录')">
+            <span class="pm-icon">📝</span>
+            <span class="pm-label">请假记录导出</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showToast('导出学生档案（含照片）')">
+            <span class="pm-icon">👤</span>
+            <span class="pm-label">学生档案导出（含照片）</span>
+            <span class="pm-arrow">›</span>
+          </div>
+        </div>
+
+        <div class="section-title">设置</div>
+        <div class="profile-menu">
+          <div class="pm-item" onclick="showSbConfigSheet()">
+            <span class="pm-icon">☁️</span>
+            <span class="pm-label">Supabase 云端同步配置</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showClassSettingsSheet()">
+            <span class="pm-icon">⚙️</span>
+            <span class="pm-label">班级信息设置</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showRosterUploadSheet()">
+            <span class="pm-icon">📋</span>
+            <span class="pm-label">班级名单上传</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showToast('权限管理')">
+            <span class="pm-icon">🔐</span>
+            <span class="pm-label">班干部权限管理</span>
+            <span class="pm-arrow">›</span>
+          </div>
+          <div class="pm-item" onclick="showToast('关于系统')">
+            <span class="pm-icon">ℹ️</span>
+            <span class="pm-label">关于智慧班级管家</span>
+            <span class="pm-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========== FAB (Floating Action Button) ========== -->
+    <div class="fab" id="fab" onclick="onFabClick()" style="display:none">+</div>
+
+    <!-- ========== Bottom Tabbar ========== -->
+    <nav class="tabbar">
+      <div class="tab-item active" data-page="home" onclick="switchPage('home')">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">首页</span>
+      </div>
+      <div class="tab-item" data-page="attendance" onclick="switchPage('attendance')">
+        <span class="tab-icon">✅</span>
+        <span class="tab-label">考勤</span>
+      </div>
+      <div class="tab-item" data-page="conduct" onclick="switchPage('conduct')">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">操行</span>
+      </div>
+      <div class="tab-item" data-page="students" onclick="switchPage('students')">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">档案</span>
+      </div>
+      <div class="tab-item" data-page="profile" onclick="switchPage('profile')">
+        <span class="tab-icon">👤</span>
+        <span class="tab-label">我的</span>
+      </div>
+    </nav>
+
+    <!-- ========== Bottom Sheets & Modals ========== -->
+
+    <!-- Share Modal -->
+    <div class="modal-mask" id="shareModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">🔗 分享给班长</span>
+          <span class="modal-close" onclick="hideModal('shareModal')">✕</span>
+        </div>
+        <div class="modal-body" style="text-align:center">
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">班长扫码即可在手机端协助点名，数据实时同步</p>
+          <div class="qr-box" id="mAttendanceQrcode">
+          </div>
+          <div style="margin-top:16px;background:var(--bg-main);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-2);display:flex;align-items:center;justify-content:space-between">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" id="attLinkText"></span>
+            <button class="btn btn-primary btn-sm" onclick="copyLink('attLinkText')">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Absent Modal -->
+    <div class="modal-mask" id="exportAbsentModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📋 导出缺席名单</span>
+          <span class="modal-close" onclick="hideModal('exportAbsentModal')">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="ef-option selected" onclick="selectEf(this,'ids')">
+            <div class="ef-title">格式A：纯学号</div>
+            <div class="ef-sample">01, 05, 12, 23</div>
+            <div class="ef-desc">适合发班长去宿舍喊人</div>
+          </div>
+          <div class="ef-option" onclick="selectEf(this,'full')">
+            <div class="ef-title">格式B：学号+姓名</div>
+            <div class="ef-sample">01-张三, 05-李四</div>
+            <div class="ef-desc">适合发家长群或打印</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('exportAbsentModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="copyAbsentList()" style="flex:2">📋 一键复制</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supabase Config Sheet -->
+    <div class="modal-mask" id="sbConfigSheet">
+      <div class="modal-sheet" style="max-height:80%">
+        <div class="modal-header">
+          <span class="modal-title">☁️ Supabase 云端同步</span>
+          <span class="modal-close" onclick="hideModal('sbConfigSheet')">✕</span>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">配置后，考勤点名、品德操行、违纪收集、工作台待办等数据将写入云端，PC 端与手机端自动同步，分发的收集表/考勤链接任意设备可提交回传。</p>
+          <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Supabase Project URL</label>
+          <input type="text" id="mSbUrlInput" class="form-input" placeholder="https://zhbj-api.784558474.workers.dev" style="font-size:13px;padding:10px 12px;margin-bottom:10px;width:100%;border:1px solid var(--border);border-radius:8px">
+          <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Supabase anon public key</label>
+          <input type="text" id="mSbAnonInput" class="form-input" placeholder="eyJhbGciOi..." style="font-size:13px;padding:10px 12px;margin-bottom:6px;width:100%;border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px" id="mSbStatus"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('sbConfigSheet')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="saveSbConfigMobile()" style="flex:2">保存并启用云端同步</button>
+        </div>
+      </div>
+    </div>
+    <!-- Class Settings Sheet -->
+    <div class="modal-mask" id="classSettingsSheet">
+      <div class="modal-sheet" style="max-height:80%">
+        <div class="modal-header">
+          <span class="modal-title">⚙️ 班级信息设置</span>
+          <span class="modal-close" onclick="hideModal('classSettingsSheet')">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">班级名称</label>
+            <input type="text" class="form-input" value="21级计算机1班">
+          </div>
+          <div class="form-group">
+            <label class="form-label">年级</label>
+            <select class="form-select"><option>2021级</option><option>2022级</option><option>2023级</option><option>2024级</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">专业</label>
+            <input type="text" class="form-input" value="计算机应用技术">
+          </div>
+          <div class="form-group">
+            <label class="form-label">班主任</label>
+            <input type="text" class="form-input" value="李老师">
+          </div>
+          <div class="form-group">
+            <label class="form-label">班级人数</label>
+            <input type="text" class="form-input" value="58" readonly style="background:var(--bg-main)">
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:8px;padding:12px 16px">
+          <button class="btn btn-default btn-block" onclick="hideModal('classSettingsSheet')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="showToast('班级信息已保存');hideModal('classSettingsSheet')" style="flex:2">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roster Upload Sheet -->
+    <div class="modal-mask" id="rosterUploadSheet">
+      <div class="modal-sheet" style="max-height:85%">
+        <div class="modal-header">
+          <span class="modal-title">📋 班级名单上传</span>
+          <span class="modal-close" onclick="hideModal('rosterUploadSheet')">✕</span>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">上传Excel名单后，学生档案和考勤点名将自动同步更新</p>
+          <div style="background:var(--primary-light);border-radius:var(--radius-xs);padding:10px;margin-bottom:12px">
+            <div style="font-size:12px;font-weight:600;color:var(--primary-dark);margin-bottom:4px">📋 名单模板格式</div>
+            <div style="font-size:11px;color:var(--primary-dark);line-height:1.6">
+              学号 | 姓名 | 性别 | 宿舍号 | 家长联系方式 | 家庭住址<br>
+              示例：20240301 | 张三 | 男 | 101 | 13800138000 | 广州市天河区
+            </div>
+            <button class="btn btn-default btn-sm" style="margin-top:8px" onclick="showToast('模板已下载')">⬇ 下载模板</button>
+          </div>
+          <div class="cf-upload-area" id="mRosterUploadArea" onclick="document.getElementById('mRosterFileInput').click()">
+            <div id="mRosterPlaceholder">
+              <div style="font-size:36px">📋</div>
+              <div style="font-size:13px;color:var(--text-3);margin-top:8px">点击上传班级名单</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:4px">支持 .xlsx / .xls / .csv</div>
+            </div>
+            <div id="mRosterResult" style="display:none"></div>
+          </div>
+          <input type="file" id="mRosterFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleMRosterUpload(this)">
+          <div style="margin-top:12px;padding:10px;background:var(--bg-main);border-radius:var(--radius-xs)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-size:12px;font-weight:600">当前名单状态</span>
+              <span class="tag tag-green" id="mRosterStatusTag">已加载 58人</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-3)">已同步至学生档案、考勤点名、品德操行</div>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:12px 16px">
+          <button class="btn btn-default btn-block" onclick="hideModal('rosterUploadSheet')">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Duty Sheet (值日生) -->
+    <div class="modal-mask" id="dutySheet">
+      <div class="modal-sheet" style="max-height:88%">
+        <div class="modal-header">
+          <span class="modal-title">🧹 值日生安排</span>
+          <span class="modal-close" onclick="hideModal('dutySheet')">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="cf-upload-area" id="mDutyUploadArea" onclick="document.getElementById('mDutyFileInput').click()" style="margin-bottom:12px">
+            <div id="mDutyPlaceholder">
+              <div style="font-size:36px">📄</div>
+              <div style="font-size:13px;color:var(--text-3);margin-top:8px">点击上传值日表 Excel</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:4px">支持 .xlsx · 自动识别星期与分工</div>
+            </div>
+            <div id="mDutyResult" style="display:none"></div>
+          </div>
+          <input type="file" id="mDutyFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleMDutyUpload(this)">
+          <div id="mDutyWeekView"></div>
+        </div>
+        <div class="modal-footer" style="padding:12px 16px">
+          <button class="btn btn-default btn-block" onclick="hideModal('dutySheet')">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photo Upload Modal -->
+    <div class="modal-mask" id="photoUploadModal">
+      <div class="modal-sheet" style="max-height:70%">
+        <div class="modal-header">
+          <span class="modal-title">📷 上传照片</span>
+          <span class="modal-close" onclick="hideModal('photoUploadModal')">✕</span>
+        </div>
+        <div class="modal-body" style="text-align:center">
+          <div class="crop-area" onclick="showToast('请选择图片')">
+            <div>
+              <div style="font-size:48px">🖼️</div>
+              <div style="font-size:13px;color:var(--text-3);margin-top:8px">点击选择图片</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:4px">jpg/png/webp · &lt;5MB</div>
+            </div>
+            <div class="crop-overlay"></div>
+          </div>
+          <p style="font-size:11px;color:var(--text-3);margin-top:12px">拖动调整裁剪区域 · 1:1比例<br>自动生成缩略图(100×100) + 原图</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('photoUploadModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="showToast('照片已上传');hideModal('photoUploadModal')" style="flex:2">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notice Modal -->
+    <div class="modal-mask" id="noticeModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📢 发布通知</span>
+          <span class="modal-close" onclick="hideModal('noticeModal')">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label"><span class="req">*</span>通知标题</label>
+            <input type="text" class="form-input" placeholder="请输入标题">
+          </div>
+          <div class="form-group">
+            <label class="form-label"><span class="req">*</span>通知内容</label>
+            <textarea class="form-textarea" placeholder="请输入通知内容..." rows="4"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">发送范围</label>
+            <div style="display:flex;gap:12px">
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" checked=""> 班干部</label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" checked=""> 家长群</label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('noticeModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="showToast('通知已发布');hideModal('noticeModal')" style="flex:2">发布</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Detail Bottom Sheet -->
+    <div class="modal-mask" id="studentDetailModal">
+      <div class="bottom-sheet" id="studentBottomSheet" style="position:static;transform:none">
+        <div class="bs-handle"></div>
+        <div class="bs-close" onclick="hideModal('studentDetailModal')">✕</div>
+        <div class="bs-header">
+          <div class="bs-avatar" id="bsAvatar" style="background:var(--primary)">张</div>
+          <div>
+            <div class="bs-name" id="bsName">张三</div>
+            <div class="bs-id" id="bsId">20240301 · 男 · 宿舍101</div>
+          </div>
+        </div>
+        <div class="bs-info">
+          <div class="bs-row"><span class="bs-label">学号</span><span class="bs-value" id="bsFullId">20240301</span></div>
+          <div class="bs-row"><span class="bs-label">性别</span><span class="bs-value" id="bsGender">男</span></div>
+          <div class="bs-row"><span class="bs-label">宿舍号</span><span class="bs-value" id="bsDorm">101</span></div>
+          <div class="bs-row"><span class="bs-label">家长电话</span><span class="bs-value" id="bsPhone">138****6688</span></div>
+          <div class="bs-row"><span class="bs-label">家庭住址</span><span class="bs-value" id="bsAddress">广州市天河区</span></div>
+          <div class="bs-row"><span class="bs-label">本周操行分</span><span class="bs-value" style="color:var(--success-dark)" id="bsScore">94分</span></div>
+          <div style="margin-top:12px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px">历史趋势</div>
+            <div id="bsTrendChart" style="height:160px"></div>
+          </div>
+          <div style="margin-top:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-size:13px;font-weight:600">违纪情况记录</span>
+              <span class="tag tag-red" id="bsViolationTag">0条</span>
+            </div>
+            <div class="violation-list" id="bsViolationList"></div>
+          </div>
+          <div style="margin-top:16px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px">📊 成绩 / 考证记录</div>
+            <div id="mBsScoreSection"></div>
+          </div>
+        </div>
+        <div class="bs-actions">
+          <button class="btn btn-default btn-block" style="flex:1">编辑信息</button>
+          <button class="btn btn-primary btn-block" style="flex:1" onclick="hideModal('studentDetailModal');showPhotoUploadModal()">📷 上传照片</button>
+        </div>
+        <div style="height:12px;padding:0 20px 8px">
+          <button class="btn btn-danger btn-block btn-sm" onclick="showViolationModal(currentStudentId)">📝 登记违纪</button>
+        </div>
+        <div style="height:20px"></div>
+      </div>
+    </div>
+
+    <!-- Violation Record Modal -->
+    <div class="modal-mask" id="violationModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📝 违纪情况登记</span>
+          <span class="modal-close" onclick="hideModal('violationModal')">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label"><span class="req">*</span>学生</label>
+            <div id="viStudentName" style="background:var(--bg-main);border-radius:var(--radius-xs);padding:10px 14px;font-size:14px;font-weight:500">张三 (20240301)</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><span class="req">*</span>违纪类型</label>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="violationTypes">
+              <div class="vi-type-option" onclick="selectViolationType(this,'晚修手机未交')">晚修手机未交</div>
+              <div class="vi-type-option" onclick="selectViolationType(this,'宿舍手机未交')">宿舍手机未交</div>
+              <div class="vi-type-option" onclick="selectViolationType(this,'旷课')">旷课</div>
+              <div class="vi-type-option" onclick="selectViolationType(this,'更多')" id="viMoreOption">更多</div>
+              <input type="text" class="form-input" id="viCustomInput" placeholder="输入自定义违纪类型..." style="display:none;margin-top:8px">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><span class="req">*</span>扣分/加分</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button class="btn btn-default btn-sm" onclick="adjustViScore(-1)">−</button>
+              <input type="text" class="form-input" id="viScoreInput" value="1" style="text-align:center;font-size:18px;font-weight:700;max-width:80px" readonly>
+              <button class="btn btn-default btn-sm" onclick="adjustViScore(1)">+</button>
+              <span style="font-size:12px;color:var(--text-3);margin-left:4px" id="viScoreLabel">扣分</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">违纪描述</label>
+            <textarea class="form-textarea" id="viDescInput" placeholder="请描述具体违纪情况..." rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">日期</label>
+            <input type="date" class="form-input" id="viDateInput" value="2026-09-08">
+          </div>
+          <div class="form-group">
+            <label class="form-label">违纪记录照片（拍照上传）</label>
+            <div class="cf-upload-area" onclick="document.getElementById('viPhotoInput').click()">
+              <div id="viUploadPlaceholder">
+                <div style="font-size:36px">📸</div>
+                <div style="font-size:13px;color:var(--text-3);margin-top:8px">点击拍照或选择图片</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">支持 jpg/png/webp · &lt;5MB</div>
+              </div>
+              <img id="viPhotoPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px" />
+            </div>
+            <input type="file" id="viPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewViPhoto(this)">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('violationModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="submitViolation()" style="flex:2">提交记录</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collection Form Link Modal -->
+    <div class="modal-mask" id="collectionFormModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">🔗 违纪记录收集表</span>
+          <span class="modal-close" onclick="hideModal('collectionFormModal')">✕</span>
+        </div>
+        <div class="modal-body">
+          <!-- Step 1: Share Link -->
+          <div id="cfShareSection">
+            <p style="font-size:13px;color:var(--text-3);margin-bottom:16px">班干部（宿管/劳委）在手机端打开链接即可填写违纪情况，提交后自动汇总到学生档案卡片中</p>
+            <div class="qr-box" style="margin-bottom:16px" id="cfQrcode">
+            </div>
+            <div style="background:var(--bg-main);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-2);display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" id="cfLinkText"></span>
+                <button class="btn btn-primary btn-sm" onclick="copyLink('cfLinkText')">复制</button>
+            </div>
+            <div style="background:var(--primary-light);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--primary-dark);margin-bottom:16px">
+              <div style="font-weight:600;margin-bottom:4px">📋 收集表填写说明</div>
+              <div>1. 选择学生姓名（下拉菜单）<br>2. 填写违纪时间<br>3. 选择违纪类型（或选"更多"自定义）<br>4. 拍照上传违纪情况通知书<br>5. 提交后自动汇总至对应学生卡片</div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="openCollectionForm()">📱 预览填写界面</button>
+          </div>
+          <!-- Step 2: Fill Form -->
+          <div id="cfFillSection" style="display:none">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+              <button class="btn btn-default btn-sm" onclick="backToShareSection()">‹ 返回</button>
+              <span style="font-size:13px;font-weight:600">违纪情况收集表</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><span class="req">*</span>学生姓名</label>
+              <select class="form-select" id="cfStudentSelect" style="width:100%;padding:10px 14px"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><span class="req">*</span>违纪时间</label>
+              <input type="datetime-local" class="form-input" id="cfTimeInput" value="2026-09-08T14:30">
+            </div>
+            <div class="form-group">
+              <label class="form-label"><span class="req">*</span>违纪类型</label>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="cfViolationTypes">
+                <div class="vi-type-option" onclick="selectCfType(this,'晚修手机未交')">晚修手机未交</div>
+                <div class="vi-type-option" onclick="selectCfType(this,'宿舍手机未交')">宿舍手机未交</div>
+                <div class="vi-type-option" onclick="selectCfType(this,'旷课')">旷课</div>
+                <div class="vi-type-option" onclick="selectCfType(this,'更多')" id="cfMoreOption">更多</div>
+                <input type="text" class="form-input" id="cfCustomInput" placeholder="输入自定义违纪类型..." style="display:none;margin-top:8px">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><span class="req">*</span>扣分/加分</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn btn-default btn-sm" onclick="adjustCfScore(-1)">−</button>
+                <input type="text" class="form-input" id="cfScoreInput" value="1" style="text-align:center;font-size:18px;font-weight:700;max-width:80px" readonly>
+                <button class="btn btn-default btn-sm" onclick="adjustCfScore(1)">+</button>
+                <span style="font-size:12px;color:var(--text-3);margin-left:4px" id="cfScoreLabel">扣分</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">违纪描述</label>
+              <textarea class="form-textarea" id="cfDescInput" placeholder="请描述具体违纪情况..." rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">违纪情况通知书（拍照上传）</label>
+              <div class="cf-upload-area" onclick="document.getElementById('cfPhotoInput').click()">
+                <div id="cfUploadPlaceholder">
+                  <div style="font-size:36px">📸</div>
+                  <div style="font-size:13px;color:var(--text-3);margin-top:8px">点击拍照或选择图片</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:4px">支持 jpg/png/webp · &lt;5MB</div>
+                </div>
+                <img id="cfPhotoPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px" />
+              </div>
+              <input type="file" id="cfPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewCfPhoto(this)">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" id="cfFooter">
+          <button class="btn btn-default btn-block" onclick="hideModal('collectionFormModal')" style="flex:1">关闭</button>
+          <button class="btn btn-primary btn-block" onclick="submitCollectionForm()" style="flex:2;display:none" id="cfSubmitBtn">提交收集</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conduct Collection Sheet -->
+    <div class="modal-mask" id="conductCollectModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📊 品德操行收集表</span>
+          <span class="modal-close" onclick="hideModal('conductCollectModal')">✕</span>
+        </div>
+        <!-- Step 1: Share -->
+        <div id="ccShareSection" style="padding:0 16px">
+          <p style="font-size:12px;color:var(--text-3);margin:12px 0">班干部打开链接即可填写操行数据，提交后自动汇总到表格</p>
+          <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">
+            <div style="width:100px;height:100px;flex-shrink:0" id="ccQrcode"></div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px">分享链接</div>
+              <div style="background:var(--bg-main);border-radius:6px;padding:6px 10px;font-size:11px;display:flex;align-items:center;justify-content:space-between">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" id="ccLinkText"></span>
+                <button class="btn btn-primary btn-sm" onclick="copyLink('ccLinkText')">复制</button>
+              </div>
+            </div>
+          </div>
+          <div style="background:var(--primary-light);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--primary-dark);margin-bottom:16px">
+            <div style="font-weight:600;margin-bottom:4px">📋 填写说明</div>
+            <div>1. 从班级名单中选择学生<br>2. 选择录入维度（黑板报/好人好事等）<br>3. 填写加分或减分数据<br>4. 上传图片佐证（可选）</div>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="openCcFill()">📱 预览填写界面</button>
+        </div>
+        <!-- Step 2: Fill -->
+        <div id="ccFillSection" style="display:none;padding:0 16px">
+          <div style="display:flex;align-items:center;gap:8px;margin:12px 0">
+            <button class="btn btn-outline btn-sm" onclick="backToCcShare()">‹ 返回</button>
+            <span style="font-size:13px;font-weight:600">操行数据收集表</span>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">1. 选择学生</label>
+            <select class="form-input" id="ccStudentSelect" style="width:100%"></select>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">2. 选择录入维度</label>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px" id="ccDimTypes">
+              <div class="vi-type-option" onclick="selectCcDim(this,'d1','加分')">1.黑板报</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d2','加分')">2.好人好事</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d3','加分')">3.志愿者</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d4','加分')">4.班干部</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d5','加分')">5.团体活动</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d6','减分')">6.班级卫生</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d7','减分')">7.宿舍/手机</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d8','减分')">8.晚修纪律</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d9','减分')">9.课堂/作业</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d10','加分')">10.课堂加分</div>
+              <div class="vi-type-option" onclick="selectCcDim(this,'d11','减分')">11.出勤/仪容</div>
+            </div>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">3. 填写数据</label>
+            <textarea class="form-input" id="ccDescInput" placeholder="描述具体情况..." rows="2" style="width:100%"></textarea>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+              <button class="btn btn-outline btn-sm" onclick="adjustCcScore(-1)">−</button>
+              <input type="text" class="form-input" id="ccScoreInput" value="1" style="text-align:center;font-weight:700;max-width:60px" readonly>
+              <button class="btn btn-outline btn-sm" onclick="adjustCcScore(1)">+</button>
+              <span id="ccScoreType" style="font-size:11px;color:var(--text-3)">分</span>
+            </div>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4. 上传图片佐证</label>
+            <div class="cf-upload-area" onclick="document.getElementById('ccPhotoInput').click()">
+              <div id="ccUploadPlaceholder">
+                <div style="font-size:28px">📸</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:4px">点击拍照或选择图片</div>
+              </div>
+              <img id="ccPhotoPreview" style="display:none;width:100%;border-radius:6px;margin-top:4px" />
+            </div>
+            <input type="file" id="ccPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewCcPhoto(this)">
+          </div>
+        </div>
+        <div class="modal-footer" id="ccFooter">
+          <button class="btn btn-default btn-block" onclick="hideModal('conductCollectModal')" style="flex:1">关闭</button>
+          <button class="btn btn-primary btn-block" onclick="submitCcForm()" style="flex:2;display:none" id="ccSubmitBtn">提交收集</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-mask" id="cwWeekViewModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">⭐ 班级操行分 · 每周对比</span>
+          <span class="modal-close" onclick="hideModal('cwWeekViewModal')">✕</span>
+        </div>
+        <div class="modal-body" id="cwWeekViewBody" style="max-height:70vh;overflow:auto;padding:12px 16px"></div>
+        <div class="modal-footer">
+          <button class="btn btn-default btn-block" onclick="hideModal('cwWeekViewModal')">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">班级切换</div>
+
+  </div>
+</div>
+
+<!-- Standalone Form View (for shared links) -->
+<div id="standaloneFormView"></div>
+
+<script>
+// ========== Mock Data ==========
+const studentNames = ['张三','李四','王五','赵六','钱七','孙八','周九','吴十','郑十一','王十二','刘十三','陈十四','卫十五','蒋十六','沈十七','韩十八','杨十九','朱二十','秦廿一','尤廿二','许廿三','何廿四','吕廿五','施廿六','张廿七','孔廿八','曹廿九','严三十','华卅一','金卅二','魏卅三','陶卅四','姜卅五','戚卅六','谢卅七','邹卅八','喻卅九','柏四十','水四一','窦四二','章四三','云四四','苏四五','潘四六','葛四七','奚四八','范四九','彭五十','鲁五一','韦五二','昌五三','马五四','苗五五','花五六','方五七','俞五八'];
+const avatarColors = ['#1677FF','#52C41A','#FA8C16','#FF4D4F','#722ED1','#13C2C2','#EB2F96','#FAAD14'];
+const addresses = ['广州市天河区','广州市越秀区','广州市海珠区','广州市番禺区','广州市白云区','广州市黄埔区','深圳市南山区','佛山市禅城区'];
+const violationTypes = ['晚修手机未交','宿舍手机未交','旷课','更多'];
+const violationDescs = {
+  '晚修手机未交': ['晚修期间未交手机','手机藏在抽屉内','交手机壳不交手机','晚修结束后才交'],
+  '宿舍手机未交': ['就寝后仍使用手机','熄灯后玩手机被发现','宿舍内藏匿手机','午休时使用手机'],
+  '旷课': ['早读旷课','晚修旷课','体育课旷课','集会旷课'],
+};
+const students = [];
+for (let i = 0; i < 58; i++) {
+  const id = String(i+1).padStart(2,'0');
+  const name = studentNames[i];
+  const dorm = '10' + (Math.floor(i/6)+1);
+  const hasPhoto = Math.random() > 0.75;
+  const color = avatarColors[i % avatarColors.length];
+  const address = addresses[i % addresses.length] + (100+i*3) + '号';
+  // Generate violation records
+  const violations = [];
+  const viCount = Math.random() > 0.6 ? Math.floor(Math.random()*4)+1 : 0;
+  const fixedTypes = ['晚修手机未交','宿舍手机未交','旷课'];
+  for (let j = 0; j < viCount; j++) {
+    const vType = fixedTypes[Math.floor(Math.random()*fixedTypes.length)];
+    const descs = violationDescs[vType];
+    violations.push({
+      type: vType,
+      desc: descs[Math.floor(Math.random()*descs.length)],
+      score: Math.floor(Math.random()*3)+1,
+      isBonus: false,
+      date: '9月' + (Math.floor(Math.random()*8)+1) + '日',
+    });
+  }
+  students.push({ id, fullId:'202403'+id, name, dorm, gender: i%2===0?'男':'女', phone:'138****'+(1000+i*7), address, hasPhoto, color, violations,
+    conduct: {
+      d1: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
+      d2: Math.random()>0.9 ? Math.floor(Math.random()*2)+1 : 0,
+      d3: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
+      d4: Math.random()>0.7 ? Math.floor(Math.random()*3)+1 : 0,
+      d5: Math.random()>0.85 ? Math.floor(Math.random()*2)+1 : 0,
+      d6: Math.random()>0.5 ? Math.floor(Math.random()*4) : 0,
+      d7: Math.random()>0.5 ? Math.floor(Math.random()*5) : 0,
+      d8: Math.random()>0.6 ? Math.floor(Math.random()*4) : 0,
+      d9: Math.random()>0.5 ? Math.floor(Math.random()*5) : 0,
+      d10: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
+      d11: Math.random()>0.6 ? Math.floor(Math.random()*3) : 0,
+      note: Math.random()>0.8 ? '表现良好' : '',
+    }
+  });
+}
+students.forEach(s => {
+  const adds = s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10;
+  const deducts = s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11;
+  s.conduct.total = 100 + adds - deducts;
+});
+
+// ================== Supabase 云端同步层（真正跨设备数据回传）==================
+// 配置存于 localStorage，由 PC 端“数据同步配置”入口写入，手机端读取同一配置。
+var SB_URL_KEY = 'smartclass_supabase_url';
+var SB_ANON_KEY = 'smartclass_supabase_anon';
+function sbConfig() {
+  try {
+    return { url: localStorage.getItem(SB_URL_KEY) || '', anon: localStorage.getItem(SB_ANON_KEY) || '' };
+  } catch(e) { return { url: '', anon: '' }; }
+}
+function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
+function sbFetch(table, cb) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) { if (cb) cb([]); return; }
+  fetch(c.url + '/rest/v1/' + table + '?select=*&order=ts.asc', {
+    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (Array.isArray(d)) cb(d); else cb([]);
+  }).catch(function(){ cb([]); });
+}
+// 从 Supabase 拉取并合并品德操行/违纪记录到本地学生数据
+function applyCloudRecords() {
+  if (!sbEnabled()) return;
+  sbFetch('conduct_records', function(rows) {
+    (rows||[]).forEach(function(r) {
+      var s = students.find(function(x){ return x.fullId === r.full_id; });
+      if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
+      s.conduct[r.dim] += r.score;
+      s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
+    });
+    try { if (typeof initConductCards==='function') initConductCards(); } catch(e){}
+  });
+  sbFetch('violation_records', function(rows) {
+    (rows||[]).forEach(function(r) {
+      var s = students.find(function(x){ return x.fullId === r.full_id; });
+      if (!s) return;
+      s.violations.unshift({ type: r.vtype, desc: r.description, score: -r.score, isBonus: false, date: r.vdate, photo: r.photo });
+      s.conduct.total -= r.score;
+      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 += r.score;
+      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
+      else s.conduct.d9 += r.score;
+    });
+    try { if (typeof initMStudentTable==='function') initMStudentTable(); } catch(e){}
+  });
+}
+
+// ================== 成绩 / 考证 展示（本地 + 云端同步） ==================
+var SCORE_KEY = 'zhbj_student_scores';
+function loadScores() { try { var d = localStorage.getItem(SCORE_KEY); return d ? JSON.parse(d) : {}; } catch(e) { return {}; } }
+function scoreGroupHtmlM(semName, exams) {
+  var html = '<div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;background:#fff"><div style="font-size:12px;font-weight:600;margin-bottom:5px;color:var(--text-1)">' + semName +
+    ((exams['期中']?' 含期中':'')+(exams['期中']&&exams['期末']?'·':'')+(exams['期末']?'含期末':'')) + '</div>';
+  ['期中','期末'].forEach(function(ex){
+    if (exams[ex]) {
+      var items = Object.keys(exams[ex]).map(function(sub){ return '<span style="display:inline-block;background:var(--bg-main);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px">' + sub + ' <b style="color:var(--primary)">' + exams[ex][sub] + '</b></span>'; }).join('');
+      html += '<div style="font-size:10px;color:var(--text-2);margin:1px 0 3px">' + ex + '</div><div>' + items + '</div>';
+    }
+  });
+  if (!exams['期中'] && !exams['期末']) html += '<div style="color:var(--text-3);font-size:11px">暂无该学期成绩</div>';
+  return html + '</div>';
+}
+function mStudentScoresHtml(s) {
+  var scores = loadScores();
+  var entry = scores[s.name];
+  if (!entry || ((!entry.semester || !Object.keys(entry.semester).length) && !(entry.cert && (entry.cert.certCat || entry.cert.final)))) {
+    return '<div style="text-align:center;padding:10px;color:var(--text-3);font-size:11px">暂无成绩记录</div>';
+  }
+  var html = '';
+  if (entry.cert && (entry.cert.certCat || entry.cert.final)) {
+    html += '<div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;background:#fff"><div style="font-size:12px;font-weight:600;margin-bottom:5px">🎨 美术考证' + (entry.cert.final ? ' · 最终 ' + entry.cert.final : '') + '</div>' +
+      '<span style="display:inline-block;background:var(--bg-main);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px">' + (entry.cert.subject || '报考科目') + '</span>' +
+      '<span style="display:inline-block;background:var(--bg-main);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px">理论 <b style="color:var(--primary)">' + (entry.cert.theory || '—') + '</b></span>' +
+      '<span style="display:inline-block;background:var(--bg-main);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px">技能 <b style="color:var(--primary)">' + (entry.cert.skill || '—') + '</b></span>' +
+      (entry.cert.certNo ? '<span style="display:inline-block;background:var(--bg-main);border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0;font-size:11px">证书号 ' + entry.cert.certNo + '</span>' : '') + '</div>';
+  }
+  if (entry.semester) {
+    Object.keys(entry.semester).forEach(function(sem){ html += scoreGroupHtmlM(sem, entry.semester[sem]); });
+  }
+  return html;
+}
+function applyCloudScores() {
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) return;
+  if (typeof sbFetch !== 'function') return;
+  sbFetch('student_scores', function(rows) {
+    var byName = {};
+    (rows || []).forEach(function(r) {
+      if (!r || !r.name) return;
+      var e = byName[r.name] || (byName[r.name] = { name: r.name, semester: {}, cert: null });
+      if (r.sem) {
+        if (!e.semester[r.sem]) e.semester[r.sem] = {};
+        if (!e.semester[r.sem][r.exam]) e.semester[r.sem][r.exam] = {};
+        e.semester[r.sem][r.exam][r.subject] = r.score;
+      } else if (r.cert_final || r.cert_cat) {
+        e.cert = { certCat: r.cert_cat || '', subject: r.subject || '', theory: r.cert_theory || '', skill: r.cert_skill || '', final: r.cert_final || '', certNo: r.cert_no || '' };
+      }
+    });
+    if (!Object.keys(byName).length) return;
+    var local = loadScores();
+    Object.keys(byName).forEach(function(n) { local[n] = byName[n]; });
+    try { localStorage.setItem(SCORE_KEY, JSON.stringify(local)); } catch(e) {}
+    try { rerenderMProfileScores(); } catch(e) {}
+  });
+}
+function rerenderMProfileScores() {
+  var s = students[currentStudentId];
+  if (!s) return;
+  var p = document.getElementById('mProfileScores');
+  if (p) p.innerHTML = mStudentScoresHtml(s);
+  var bs = document.getElementById('mBsScoreSection');
+  if (bs) bs.innerHTML = mStudentScoresHtml(s);
+}
+
+// ---------- 班级操行分周数据（本地 + 云端同步展示）----------
+var CWEEK_KEY = 'zhbj_conduct_weeks_m';
+function loadCWeks() { try { var d = localStorage.getItem(CWEEK_KEY); return d ? JSON.parse(d) : []; } catch(e) { return []; } }
+function saveCWeks(list) { try { localStorage.setItem(CWEEK_KEY, JSON.stringify(list)); } catch(e) {} }
+// 从 Supabase 拉取班级操行分周数据并合并到本地，刷新首页卡片
+function applyCloudConductWeeks() {
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) return;
+  if (typeof sbFetch !== 'function') return;
+  sbFetch('conduct_weeks', function(rows) {
+    if (!Array.isArray(rows) || !rows.length) { renderHomeConductCard(); return; }
+    var all = loadCWeks();
+    var local = [];
+    var idx = {};
+    (all || []).forEach(function(w){ if(!idx[w.className+'||'+w.week]) { idx[w.className+'||'+w.week]=1; local.push(w); } });
+    (rows || []).forEach(function(r) {
+      if (!r || !r.week) return;
+      var key = (r.className||'') + '||' + r.week;
+      if (!idx[key]) { idx[key]=1; local.push({ className: r.className||'', teacher: r.teacher||'', week: r.week, overallAvg: r.overall, count: r.count||0, labels: r.labels||[], averages: r.averages||{} }); }
+    });
+    saveCWeks(local);
+    renderHomeConductCard();
+  });
+}
+// 首页「本周操行均分」卡片
+function renderHomeConductCard() {
+  var val = document.getElementById('cwHomeAvg'), week = document.getElementById('cwHomeWeek'), cls = document.getElementById('cwHomeClassName');
+  if (!val) return;
+  var list = loadCWeks();
+  var latest = list.length ? list[list.length - 1] : null;
+  if (latest && latest.overallAvg !== undefined && latest.overallAvg !== null) {
+    val.innerHTML = latest.overallAvg + '<span class="sc-unit">分</span>';
+    week.textContent = (latest.className ? latest.className + ' · ' : '') + latest.week + ' · 点击查看对比';
+    if (latest.className) { cls.style.display = 'inline'; cls.textContent = '　' + latest.className; }
+  } else {
+    val.innerHTML = '—<span class="sc-unit">分</span>';
+    week.textContent = '第' + cwWeekOfYearM(new Date()) + '周 · 上传后可查看';
+  }
+}
+function cwWeekOfYearM(now) {
+  var start = new Date(now.getFullYear(), 0, 1);
+  return Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
+}
+function openConductWeekView() {
+  var list = loadCWeks();
+  var body = document.getElementById('cwWeekViewBody');
+  if (!body) return;
+  if (!list.length) { body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-3);font-size:12px">暂无班级操行分周数据<br>请在 PC 端上传“班级量化汇总表”后自动同步</div>'; showModal('cwWeekViewModal'); return; }
+  var allLabels = [];
+  list.forEach(function(w){(w.labels||[]).forEach(function(l){ if(allLabels.indexOf(l)<0) allLabels.push(l); });});
+  var h = '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:320px">' +
+    '<tr style="background:var(--bg-main)"><th style="padding:6px;text-align:left">周次</th><th style="padding:6px">班级</th>' +
+    allLabels.map(function(l){return '<th style="padding:6px">'+l+'</th>';}).join('') + '<th style="padding:6px">总分</th></tr>';
+  list.forEach(function(w){
+    h += '<tr><td style="padding:6px;font-weight:600">'+w.week+'</td><td style="padding:6px">'+(w.className||'—')+'</td>' +
+      allLabels.map(function(l){ var v = (w.averages||{})[l]; return '<td style="padding:6px;text-align:center">'+(v!==undefined&&v!==null?v:'—')+'</td>'; }).join('') +
+      '<td style="padding:6px;text-align:center;font-weight:700;color:var(--success-dark)">'+(w.overallAvg!==undefined?w.overallAvg:'—')+'</td></tr>';
+  });
+  h += '</table></div>';
+  body.innerHTML = h;
+  showModal('cwWeekViewModal');
+}
+
+// ---------- Supabase 扩展工具（分享携带配置 / 考勤&待办写入）----------
+function sbParam() {
+  var c = sbConfig();
+  if (!c.url || !c.anon) return '';
+  return '?sbUrl=' + encodeURIComponent(c.url) + '&sbKey=' + encodeURIComponent(c.anon);
+}
+function sbUpsert(table, row, conflictCols) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) return;
+  try {
+    fetch(c.url + '/rest/v1/' + table + (conflictCols ? '?on_conflict=' + encodeURIComponent(conflictCols) : ''), {
+      method: 'POST',
+      headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(row)
+    }).catch(function(){});
+  } catch(e){}
+}
+function sbInsertRow(table, row) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) return;
+  try {
+    fetch(c.url + '/rest/v1/' + table, {
+      method: 'POST',
+      headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(row)
+    }).catch(function(){});
+  } catch(e){}
+}
+function sbFetchWhere(table, where, cb) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) { if (cb) cb([]); return; }
+  fetch(c.url + '/rest/v1/' + table + '?select=*&' + where, {
+    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (Array.isArray(d)) cb(d); else cb([]);
+  }).catch(function(){ cb([]); });
+}
+function todayStr() {
+  var d = new Date(), m = ('0'+(d.getMonth()+1)).slice(-2), day = ('0'+d.getDate()).slice(-2);
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+// 考勤：手机端点名页加载时拉取当日云端结果，与本地 mAttStates 合并
+function applyCloudMAttendance() {
+  if (!sbEnabled() || typeof mAttStates === 'undefined') return;
+  sbFetchWhere('attendance_records', 'att_date=eq.' + todayStr(), function(rows) {
+    (rows||[]).forEach(function(r) {
+      if (mAttStates[r.full_id] !== undefined && r.status) mAttStates[r.full_id] = r.status;
+    });
+    var grid = document.getElementById('mAttendanceGrid');
+    if (grid) {
+      Object.keys(mAttStates).forEach(function(id) {
+        var btn = grid.querySelector('.att-btn[data-id="' + id + '"]');
+        if (btn) {
+          btn.className = 'att-btn ' + (mAttStates[id] || 'unchecked');
+          var av = btn.querySelector('.att-avatar');
+          if (av) { var st = mAttStates[id]||''; av.style.background = st==='present'?'#389E0D':st==='leave'?'#FA8C16':st==='absent'?'#CF1322':'#1677FF'; }
+        }
+      });
+    }
+    if (typeof updateMAttStats === 'function') updateMAttStats();
+  });
+}
+// 待办：从云端拉取渲染到手机端待办列表
+function syncMTodosFromCloud() {
+  if (!sbEnabled()) return;
+  sbFetchWhere('todos', 'order=ts.desc', function(rows) {
+    var input = document.getElementById('todoInput');
+    if (!input || (rows||[]).length === 0) return;
+    var addRow = input.parentElement;              // .todo-add
+    var container = addRow.parentElement;          // 待办所在容器
+    // 移除当前静态示例项（.todo-item）
+    Array.prototype.slice.call(container.querySelectorAll('.todo-item')).forEach(function(el){ el.remove(); });
+    // 在 .todo-add 前插入云端待办
+    (rows||[]).forEach(function(t) {
+      var div = document.createElement('div');
+      div.className = 'todo-item' + (t.done ? ' done' : '');
+      div.dataset.id = t.id;
+      div.innerHTML = '<div class="todo-check' + (t.done?' done':'') + '" onclick="toggleTodo(this)"></div>' +
+        '<div class="todo-content"><div class="todo-title">' + (t.text||'') + '</div><div class="todo-meta">云端同步事项</div></div>' +
+        '<span class="todo-badge tag tag-blue">' + ((t.time_label||'待办')) + '</span>';
+      container.insertBefore(div, addRow);
+    });
+  });
+}
+
+// ================== 收集表共享同步层（与独立收集表页面互通）==================
+var COLLECT_CONDUCT_KEY = 'smartclass_conduct_collect';
+var COLLECT_VIOLATION_KEY = 'smartclass_violation_collect';
+function loadSharedRecords(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; }
+}
+function applySharedCollectRecords() {
+  loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r) {
+    var s = students.find(function(x){ return x.fullId === r.fullId; });
+    if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
+    s.conduct[r.dim] += r.score;
+    s.conduct.total += (r.scoreType === '加分' ? r.score : -r.score);
+  });
+  loadSharedRecords(COLLECT_VIOLATION_KEY).forEach(function(r) {
+    var s = students.find(function(x){ return x.fullId === r.fullId; });
+    if (!s) return;
+    s.violations.unshift({ type: r.type, desc: r.desc, score: -r.score, isBonus: false, date: r.date, photo: r.photo });
+    s.conduct.total -= r.score;
+    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 += r.score;
+    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
+    else s.conduct.d9 += r.score;
+  });
+}
+applySharedCollectRecords();
+// 若已配置 Supabase，初始拉取云端记录合并（支持跨设备采集回传）
+applyCloudRecords();
+// 成绩/考证云端拉取（跨端查看）
+applyCloudScores();
+// 班级操行分周数据云端拉取（PC 上传 → 手机端查看）
+applyCloudConductWeeks();
+renderHomeConductCard();
+// 工作台待办与云端双向同步
+syncMTodosFromCloud();
+// 考勤：进入考勤页时若无数据，拉取当日云端
+window.addEventListener('storage', function(e) {
+  if (e.key === COLLECT_CONDUCT_KEY || e.key === COLLECT_VIOLATION_KEY) {
+    applySharedCollectRecords();
+    try {
+      if (typeof initConductCards === 'function') initConductCards();
+      if (typeof initMStudentTable === 'function') initMStudentTable();
+    } catch(err) {}
+  }
+});
+// ========== 收集表链接：新标签独立打开 ==========
+// 与PC端共用同一云端URL配置：若配置了收集表云端地址，优先使用；否则自动用当前站点URL
+var COLLECT_BASE_KEY = 'smartclass_collect_baseurl';
+function getCollectBaseUrl() {
+  try {
+    var saved = localStorage.getItem(COLLECT_BASE_KEY);
+    if (saved && saved.trim()) return saved.trim().replace(/\/+$/, '') + '/';
+  } catch(e){}
+  var href = location.href.split('#')[0];
+  if (href.indexOf('http://') === 0 || href.indexOf('https://') === 0) {
+    return href.substring(0, href.lastIndexOf('/') + 1);
+  }
+  return null;
+}
+function getCollectShareUrl(file) {
+  var base = getCollectBaseUrl();
+  if (base) return base + file + sbParam();
+  return null;
+}
+function openConductCollect() {
+  var url = getCollectShareUrl('conduct_form.html');
+  if (!url) { showToast('请先在PC端填写收集表云端URL'); return; }
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).catch(()=>{}); } catch(e){}
+  window.open(url, '_blank');
+  showToast('已打开品德操行收集表，链接已复制');
+}
+function openViolationCollect() {
+  var url = getCollectShareUrl('violation_form.html');
+  if (!url) { showToast('请先在PC端填写收集表云端URL'); return; }
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).catch(()=>{}); } catch(e){}
+  window.open(url, '_blank');
+  showToast('已打开违纪收集表，链接已复制');
+}
+
+// ========== Navigation ==========
+const pageTitles = { home: '首页', attendance: '考勤点名', conduct: '品德操行', students: '学生档案', notice: '通知公告', profile: '我的' };
+const pageFabs = { home: 'addTodo', attendance: null, conduct: null, students: 'uploadPhoto' };
+let pageHistory = ['home'];
+
+function switchPage(page) {
+  // Push to history if different from current
+  const current = pageHistory[pageHistory.length - 1];
+  if (page !== current) pageHistory.push(page);
+  updateTopbar(page);
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  const tab = document.querySelector(`.tab-item[data-page="${page}"]`);
+  if (tab) tab.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('topbarTitle').textContent = pageTitles[page] || '';
+  // FAB
+  const fab = document.getElementById('fab');
+  if (page === 'home' || page === 'notice') { fab.style.display = 'flex'; fab.textContent = '+'; fab.onclick = () => page === 'home' ? addTodo() : showNoticeModal(); }
+  else if (page === 'students') { fab.style.display = 'flex'; fab.textContent = '📷'; fab.onclick = () => showPhotoUploadModal(); }
+  else { fab.style.display = 'none'; }
+  // Scroll to top
+  document.querySelector('.content').scrollTop = 0;
+  // 切回首页时刷新操行分卡片并从云端拉取最新（无需刷新页面）
+  if (page === 'home') { try { applyCloudConductWeeks(); } catch(e){} try { renderHomeConductCard(); } catch(e){} }
+  // Init charts
+  if (page === 'conduct') {
+    const kanbanVisible = document.getElementById('conductKanbanMode').style.display !== 'none';
+    if (kanbanVisible) setTimeout(initMCharts, 100);
+  }
+}
+
+function updateTopbar(page) {
+  const backBtn = document.getElementById('topbarBack');
+  const classBtn = document.getElementById('topbarClassBtn');
+  if (page === 'home') {
+    backBtn.classList.remove('show');
+    classBtn.style.display = 'flex';
+  } else {
+    backBtn.classList.add('show');
+    classBtn.style.display = 'none';
+  }
+}
+
+function goBack() {
+  if (pageHistory.length > 1) {
+    pageHistory.pop();
+    const prev = pageHistory[pageHistory.length - 1];
+    // Switch without pushing to history again
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    const tab = document.querySelector(`.tab-item[data-page="${prev}"]`);
+    if (tab) tab.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + prev).classList.add('active');
+    document.getElementById('topbarTitle').textContent = pageTitles[prev] || '';
+    updateTopbar(prev);
+    // FAB
+    const fab = document.getElementById('fab');
+    if (prev === 'home' || prev === 'notice') { fab.style.display = 'flex'; fab.textContent = '+'; fab.onclick = () => prev === 'home' ? addTodo() : showNoticeModal(); }
+    else if (prev === 'students') { fab.style.display = 'flex'; fab.textContent = '📷'; fab.onclick = () => showPhotoUploadModal(); }
+    else { fab.style.display = 'none'; }
+    document.querySelector('.content').scrollTop = 0;
+    if (prev === 'conduct') {
+      const kanbanVisible = document.getElementById('conductKanbanMode').style.display !== 'none';
+      if (kanbanVisible) setTimeout(initMCharts, 100);
+    }
+  } else {
+    switchPage('home');
+  }
+}
+
+// ========== Dashboard ==========
+function toggleTodo(el) {
+  el.classList.toggle('done');
+  el.parentElement.classList.toggle('done');
+  // 云端同步完成状态
+  if (sbEnabled && sbEnabled() && el.parentElement.dataset && el.parentElement.dataset.id) {
+    var done = el.parentElement.classList.contains('done');
+    sbUpsert('todos', { id: el.parentElement.dataset.id, done: done }, 'id');
+  }
+}
+function addTodo() {
+  const input = document.getElementById('todoInput');
+  if (!input || !input.value.trim()) { showToast('请输入待办内容'); return; }
+  const text = input.value.trim();
+  const list = input.parentElement;
+  const div = document.createElement('div');
+  const id = 't_' + Date.now();
+  div.className = 'todo-item';
+  div.dataset.id = id;
+  div.innerHTML = `<div class="todo-check" onclick="toggleTodo(this)"></div><div class="todo-content"><div class="todo-title">${text}</div><div class="todo-meta">刚刚添加</div></div>`;
+  list.parentElement.insertBefore(div, list);
+  input.value = '';
+  // 云端同步（PC/手机端共享同一待办库）
+  if (sbEnabled && sbEnabled()) {
+    sbInsertRow('todos', { id: id, text: text, done: false, time_label: '' });
+  }
+  showToast('已添加待办');
+}
+
+// ========== Attendance ==========
+let mAttStates = {};
+let mAttEnded = false;
+
+function initMAttendance() {
+  const grid = document.getElementById('mAttendanceGrid');
+  grid.innerHTML = '';
+  students.forEach(s => {
+    mAttStates[s.id] = 'unchecked';
+    const btn = document.createElement('div');
+    btn.className = 'att-btn unchecked';
+    btn.dataset.id = s.id;
+    btn.innerHTML = `
+      <div class="att-avatar" style="background:${s.color}">${s.name[0]}</div>
+      <div class="att-text">
+        <div class="att-id">${s.id}</div>
+        <div class="att-name">${s.name}</div>
+      </div>
+    `;
+    btn.onclick = () => cycleMAttendance(s.id);
+    grid.appendChild(btn);
+  });
+  updateMAttStats();
+  applyCloudMAttendance();
+}
+
+function cycleMAttendance(id) {
+  if (mAttEnded) return;
+  const states = ['unchecked','present','leave','unchecked'];
+  const cur = mAttStates[id];
+  const next = states[states.indexOf(cur)+1];
+  mAttStates[id] = next;
+  const btn = document.querySelector(`#mAttendanceGrid .att-btn[data-id="${id}"]`);
+  if (btn) {
+    btn.className = 'att-btn ' + next;
+    // Update avatar bg
+    const avatar = btn.querySelector('.att-avatar');
+    if (next === 'present') avatar.style.background = '#389E0D';
+    else if (next === 'leave') avatar.style.background = '#FA8C16';
+    else if (next === 'absent') avatar.style.background = '#CF1322';
+    else avatar.style.background = '#1677FF';
+  }
+  updateMAttStats();
+  // 同步到云端（班长/教师点名写入，教师端实时读取）
+  if (sbEnabled && sbEnabled() && next !== 'unchecked') {
+    sbUpsert('attendance_records', { att_date: todayStr(), full_id: id, status: next }, 'att_date,full_id');
+  }
+  // Haptic feedback simulation
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+
+function updateMAttStats() {
+  let p=0,l=0,a=0;
+  Object.values(mAttStates).forEach(s => { if(s==='present')p++; if(s==='leave')l++; if(s==='absent')a++; });
+  document.getElementById('mAttPresent').textContent = p;
+  document.getElementById('mAttLeave').textContent = l;
+  document.getElementById('mAttAbsent').textContent = a;
+}
+
+function endAttendance() {
+  mAttEnded = true;
+  Object.keys(mAttStates).forEach(id => {
+    if (mAttStates[id] === 'unchecked') {
+      mAttStates[id] = 'absent';
+      const btn = document.querySelector(`#mAttendanceGrid .att-btn[data-id="${id}"]`);
+      if (btn) { btn.className = 'att-btn absent'; btn.querySelector('.att-avatar').style.background = '#CF1322'; }
+    }
+  });
+  updateMAttStats();
+  showToast('点名结束！缺勤学生已标记');
+}
+
+function resetAttendance() {
+  mAttEnded = false;
+  Object.keys(mAttStates).forEach(id => {
+    mAttStates[id] = 'unchecked';
+    const btn = document.querySelector(`#mAttendanceGrid .att-btn[data-id="${id}"]`);
+    if (btn) { btn.className = 'att-btn unchecked'; btn.querySelector('.att-avatar').style.background = '#1677FF'; }
+  });
+  updateMAttStats();
+  showToast('已重置点名');
+}
+
+// ========== Conduct ==========
+function initConductCards() {
+  const list = document.getElementById('conductCardList');
+  list.innerHTML = '';
+  students.slice(0, 15).forEach(s => {
+    const score = s.conduct.total;
+    const sc = score >= 95 ? 'good' : score >= 85 ? 'warn' : 'bad';
+    const card = document.createElement('div');
+    card.className = 'conduct-card-item';
+    card.innerHTML = `
+      <div class="cci-header">
+        <div class="cci-avatar" style="background:${s.color}">${s.name[0]}</div>
+        <div>
+          <div class="cci-name">${s.name}</div>
+          <div class="cci-id">${s.id} · ${s.dorm}</div>
+        </div>
+        <div class="cci-score ${sc}">${score}</div>
+      </div>
+      <div class="cci-dims">
+        <div class="cci-dim"><span class="cd-label">黑板报</span><span class="cd-val" style="color:${s.conduct.d1>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d1>0?'+'+s.conduct.d1:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">好人好事</span><span class="cd-val" style="color:${s.conduct.d2>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d2>0?'+'+s.conduct.d2:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">班干部</span><span class="cd-val" style="color:${s.conduct.d4>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d4>0?'+'+s.conduct.d4:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">班级卫生</span><span class="cd-val" style="color:${s.conduct.d6>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d6>0?'-'+s.conduct.d6:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">宿舍/手机</span><span class="cd-val" style="color:${s.conduct.d7>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d7>0?'-'+s.conduct.d7:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">晚修纪律</span><span class="cd-val" style="color:${s.conduct.d8>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d8>0?'-'+s.conduct.d8:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">课堂/作业</span><span class="cd-val" style="color:${s.conduct.d9>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d9>0?'-'+s.conduct.d9:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">出勤/仪容</span><span class="cd-val" style="color:${s.conduct.d11>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d11>0?'-'+s.conduct.d11:'0'}</span></div>
+        <div class="cci-dim"><span class="cd-label">总分</span><span class="cd-val" style="font-weight:700;color:${score>=95?'var(--success-dark)':score>=85?'var(--orange)':'var(--danger)'}">${score}</span></div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+  // Load more hint
+  const more = document.createElement('div');
+  more.style.textAlign = 'center';
+  more.style.padding = '12px';
+  more.style.color = 'var(--text-3)';
+  more.style.fontSize = '12px';
+  more.textContent = '上拉加载更多（共58人）';
+  list.appendChild(more);
+}
+
+function switchConductMode(mode) {
+  document.querySelectorAll('.conduct-tab').forEach(t => t.classList.remove('active'));
+  if (mode === 'table') {
+    document.querySelectorAll('.conduct-tab')[0].classList.add('active');
+    document.getElementById('conductTableMode').style.display = '';
+    document.getElementById('conductKanbanMode').style.display = 'none';
+  } else {
+    document.querySelectorAll('.conduct-tab')[1].classList.add('active');
+    document.getElementById('conductTableMode').style.display = 'none';
+    document.getElementById('conductKanbanMode').style.display = '';
+    setTimeout(initMCharts, 100);
+  }
+}
+
+let mDeductChartInstance = null;
+function initMCharts() {
+  // Deduct chart
+  const chartDom = document.getElementById('mDeductChart');
+  if (!chartDom) return;
+  if (mDeductChartInstance) mDeductChartInstance.dispose();
+  mDeductChartInstance = echarts.init(chartDom);
+  const dims = ['班级卫生','宿舍/手机','晚修纪律','课堂/作业','出勤/仪容'];
+  const data = [
+    students.reduce((s,st)=>s+st.conduct.d6,0),
+    students.reduce((s,st)=>s+st.conduct.d7,0),
+    students.reduce((s,st)=>s+st.conduct.d8,0),
+    students.reduce((s,st)=>s+st.conduct.d9,0),
+    students.reduce((s,st)=>s+st.conduct.d11,0),
+  ];
+  mDeductChartInstance.setOption({
+    tooltip: { trigger: 'axis', formatter: '{b}: 扣{c}分' },
+    xAxis: { type: 'category', data: dims, axisLabel: { fontSize: 10, rotate: 20 } },
+    yAxis: { type: 'value' },
+    series: [{ type: 'bar', data: data.map((v,i)=>({ value:v, itemStyle:{ color:['#FF4D4F','#FA8C16','#722ED1','#13C2C2','#1677FF'][i], borderRadius:[4,4,0,0] } })), barWidth: '40%' }],
+    grid: { left: 30, right: 10, top: 20, bottom: 35 }
+  });
+  mDeductChartInstance.on('click', function(params) {
+    switchConductMode('table');
+    showToast('已下钻至「'+dims[params.dataIndex]+'」');
+  });
+
+  // Heatmap
+  const hg = document.getElementById('mHeatGrid');
+  hg.innerHTML = '';
+  const dorms = {};
+  students.forEach(s => { if(!dorms[s.dorm]) dorms[s.dorm] = { name:s.dorm, count:0, deduct:0 }; dorms[s.dorm].count++; dorms[s.dorm].deduct += s.conduct.d7; });
+  Object.values(dorms).forEach(d => {
+    const avg = d.deduct / d.count;
+    const isAlert = avg > 1.5;
+    const card = document.createElement('div');
+    card.className = 'heat-card' + (isAlert?' alert':'');
+    card.innerHTML = `<div class="hc-title">宿舍 ${d.name}</div><div class="hc-score" style="color:${isAlert?'var(--danger)':'var(--success-dark)'}">${(10-avg).toFixed(1)}</div><div class="hc-detail">${d.count}人 · 均扣${avg.toFixed(1)}分</div>`;
+    hg.appendChild(card);
+  });
+
+  // Info stream
+  const is = document.getElementById('mInfoStream');
+  if (is) {
+    const events = [
+      { t:'14:32', n:'张三', a:'宿舍/手机扣', d:'1分' },
+      { t:'14:28', n:'李四', a:'课堂/作业扣', d:'2分' },
+      { t:'14:20', n:'王五', a:'晚修纪律扣', d:'1分' },
+      { t:'14:15', n:'赵六', a:'出勤/仪容扣', d:'1分' },
+      { t:'14:08', n:'钱七', a:'班干部加分', d:'+2分' },
+      { t:'13:55', n:'孙八', a:'班级卫生扣', d:'3分' },
+    ];
+    is.innerHTML = events.map(e=>`<div class="info-item"><span class="ii-time">${e.t}</span><span class="ii-content"><span class="ii-name">${e.n}</span> ${e.a} <span style="color:var(--danger);font-weight:600">${e.d}</span></span></div>`).join('');
+  }
+}
+
+// ========== Students ==========
+let currentStudentId = null;
+
+function initMStudentTable() {
+  const tbody = document.getElementById('mStudentTableBody');
+  tbody.innerHTML = '';
+  students.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    if (i === 0) { tr.className = 'active'; currentStudentId = 0; }
+    tr.onclick = () => selectMStudent(s, tr);
+    tr.innerHTML = `
+      <td>${s.hasPhoto
+        ? `<img class="st-photo-sm" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" style="width:24px;height:24px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'" /><span class="st-avatar-sm" style="background:${s.color};display:none">${s.name[0]}</span>`
+        : `<span class="st-avatar-sm" style="background:${s.color}">${s.name[0]}</span>`
+      }</td>
+      <td>${s.fullId}</td>
+      <td>${s.name}</td>
+      <td>${s.gender}</td>
+      <td>${s.dorm}</td>
+      <td>${s.violations.length > 0 ? '<span class="tag tag-red">'+s.violations.length+'</span>' : '<span class="tag tag-gray">0</span>'}</td>
+      <td>${s.hasPhoto ? '<span class="tag tag-green">已传</span>' : '<span class="tag tag-gray">未传</span>'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  if (students[0]) selectMStudent(students[0], tbody.firstChild);
+}
+
+function selectMStudent(s, tr) {
+  document.querySelectorAll('#mStudentTable tr').forEach(r => r.classList.remove('active'));
+  if (tr) tr.classList.add('active');
+  currentStudentId = students.indexOf(s);
+  const viCount = s.violations.length;
+  const panel = document.getElementById('mProfilePanel');
+  panel.innerHTML = `
+    <div class="st-profile-photo">
+      ${s.hasPhoto
+        ? `<img class="big-photo" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="big-avatar" style="background:${s.color};display:none">${s.name[0]}</div>`
+        : `<div class="big-avatar" style="background:${s.color}">${s.name[0]}</div>`
+      }
+    </div>
+    <div class="st-profile-info">
+      <div style="font-size:15px;font-weight:600;margin-bottom:10px">${s.name} <span style="font-size:11px;color:var(--text-3);font-weight:400">${s.fullId}</span></div>
+      <div class="st-profile-row"><span class="pr-label">性别</span><span class="pr-value">${s.gender}</span></div>
+      <div class="st-profile-row"><span class="pr-label">宿舍号</span><span class="pr-value">${s.dorm}</span></div>
+      <div class="st-profile-row"><span class="pr-label">家长电话</span><span class="pr-value">${s.phone}</span></div>
+      <div class="st-profile-row"><span class="pr-label">家庭住址</span><span class="pr-value">${s.address}</span></div>
+      <div class="st-profile-row"><span class="pr-label">本周操行分</span><span class="pr-value" style="color:var(--success-dark)">${s.conduct.total}分</span></div>
+      <div class="st-profile-row"><span class="pr-label">违纪记录</span><span class="pr-value">${viCount>0?'<span class="tag tag-red">'+viCount+'条</span>':'<span class="tag tag-gray">0条</span>'}</span></div>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="showPhotoUploadModal()">${s.hasPhoto?'更换照片':'上传照片'}</button>
+        <button class="btn btn-danger btn-sm" style="flex:1" onclick="showViolationModal(currentStudentId)">📝 登记违纪</button>
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">违纪情况记录</div>
+        <div id="mProfileViolations">${renderMViolationList(s)}</div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:6px">📊 成绩 / 考证记录</div>
+        <div id="mProfileScores"></div>
+      </div>
+    </div>
+  `;
+  const psc = document.getElementById('mProfileScores');
+  if (psc) psc.innerHTML = mStudentScoresHtml(s);
+}
+
+function renderMViolationList(s) {
+  if (!s.violations || s.violations.length === 0) return '<div style="text-align:center;padding:10px;color:var(--text-3);font-size:11px">暂无违纪记录</div>';
+  return '<div class="violation-list">' + s.violations.map(v => `
+    <div class="violation-item">
+      <span class="vi-date">${v.date}</span>
+      <div class="vi-content">
+        <div class="vi-type">${v.type}</div>
+        <div class="vi-desc">${v.desc}</div>
+        ${v.photo ? '<div style="margin-top:4px"><img src="'+v.photo+'" style="width:45px;height:45px;border-radius:4px;object-fit:cover" onclick="showPhotoPreview(this.src)" /></div>' : ''}
+      </div>
+      <span class="vi-score ${v.isBonus?'bonus':''}">${v.isBonus?'+':'-'}${v.score}</span>
+    </div>
+  `).join('') + '</div>';
+}
+
+let bsTrendChart = null;
+function showStudentDetail(s) {
+  currentStudentId = students.indexOf(s);
+  document.getElementById('bsAvatar').textContent = s.name[0];
+  document.getElementById('bsAvatar').style.background = s.color;
+  document.getElementById('bsName').textContent = s.name;
+  document.getElementById('bsId').textContent = s.fullId + ' · ' + s.gender + ' · 宿舍' + s.dorm;
+  document.getElementById('bsFullId').textContent = s.fullId;
+  document.getElementById('bsGender').textContent = s.gender;
+  document.getElementById('bsDorm').textContent = s.dorm;
+  document.getElementById('bsPhone').textContent = s.phone;
+  document.getElementById('bsAddress').textContent = s.address;
+  document.getElementById('bsScore').textContent = s.conduct.total + '分';
+  const bsScores = document.getElementById('mBsScoreSection');
+  if (bsScores) bsScores.innerHTML = mStudentScoresHtml(s);
+  // Render violations
+  const viTag = document.getElementById('bsViolationTag');
+  const viList = document.getElementById('bsViolationList');
+  if (s.violations.length === 0) {
+    viTag.textContent = '0条';
+    viTag.className = 'tag tag-gray';
+    viList.innerHTML = '<div class="empty-state">暂无违纪记录</div>';
+  } else {
+    viTag.textContent = s.violations.length + '条';
+    viTag.className = 'tag tag-red';
+    viList.innerHTML = s.violations.map(v => `
+      <div class="violation-item">
+        <span class="vi-date">${v.date}</span>
+        <div class="vi-content">
+          <div class="vi-type">${v.type}</div>
+          <div class="vi-desc">${v.desc}</div>
+          ${v.photo ? '<div style="margin-top:6px"><img src="'+v.photo+'" style="width:60px;height:60px;border-radius:6px;object-fit:cover" onclick="showPhotoPreview(this.src)" /></div>' : ''}
+        </div>
+        <span class="vi-score ${v.isBonus?'bonus':''}">${v.isBonus?'+':'-'}${v.score}</span>
+      </div>
+    `).join('');
+  }
+  showModal('studentDetailModal');
+  setTimeout(() => {
+    if (bsTrendChart) bsTrendChart.dispose();
+    const dom = document.getElementById('bsTrendChart');
+    if (!dom) return;
+    bsTrendChart = echarts.init(dom);
+    const weeks = ['第4周','第5周','第6周','第7周','第8周'];
+    bsTrendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type:'category', data: weeks, axisLabel: { fontSize: 10 } },
+      yAxis: { type:'value', min: 75, max: 105, axisLabel: { fontSize: 10 } },
+      series: [{ type:'line', data:[96,94,98,95,s.conduct.total], smooth:true, areaStyle:{ color:'rgba(22,119,255,0.1)' }, lineStyle:{ color:'#1677FF', width:2 }, itemStyle:{ color:'#1677FF' }, markLine:{ data:[{ yAxis:85, lineStyle:{ color:'#FF4D4F', type:'dashed' } }], silent:true } }],
+      grid: { left: 30, right: 10, top: 15, bottom: 20 }
+    });
+  }, 200);
+}
+
+// ========== Violation Modal ==========
+let viSelectedType = null;
+let viScore = 1;
+let viIsBonus = false;
+let viPhotoData = null;
+
+function showViolationModal(studentIdx) {
+  if (studentIdx === undefined || studentIdx === null) studentIdx = currentStudentId;
+  currentStudentId = studentIdx;
+  const s = students[studentIdx];
+  if (!s) return;
+  document.getElementById('viStudentName').textContent = s.name + ' (' + s.fullId + ')';
+  // Reset form
+  viSelectedType = null;
+  viScore = 1;
+  viIsBonus = false;
+  viPhotoData = null;
+  document.querySelectorAll('#violationTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('viScoreInput').value = '1';
+  document.getElementById('viScoreInput').style.color = 'var(--danger)';
+  document.getElementById('viScoreLabel').textContent = '扣分';
+  document.getElementById('viDescInput').value = '';
+  document.getElementById('viPhotoPreview').style.display = 'none';
+  document.getElementById('viPhotoPreview').src = '';
+  document.getElementById('viUploadPlaceholder').style.display = '';
+  document.querySelectorAll('#violationModal .cf-upload-area').forEach(el => el.classList.remove('has-photo'));
+  showModal('violationModal');
+}
+
+function previewViPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    viPhotoData = e.target.result;
+    const preview = document.getElementById('viPhotoPreview');
+    const placeholder = document.getElementById('viUploadPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    document.querySelectorAll('#violationModal .cf-upload-area').forEach(el => el.classList.add('has-photo'));
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectViolationType(el, type) {
+  document.querySelectorAll('#violationTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  const customInput = document.getElementById('viCustomInput');
+  if (type === '更多') {
+    customInput.style.display = '';
+    customInput.focus();
+    viSelectedType = '';
+  } else {
+    customInput.style.display = 'none';
+    customInput.value = '';
+    viSelectedType = type;
+  }
+  viIsBonus = false;
+  viScore = 1;
+  document.getElementById('viScoreInput').value = '1';
+  document.getElementById('viScoreInput').style.color = 'var(--danger)';
+  document.getElementById('viScoreLabel').textContent = '扣分';
+}
+
+function adjustViScore(delta) {
+  viScore = Math.max(1, viScore + delta);
+  document.getElementById('viScoreInput').value = viScore;
+}
+
+function submitViolation() {
+  let actualType = viSelectedType;
+  if (!actualType) {
+    const customVal = document.getElementById('viCustomInput').value.trim();
+    if (!customVal) { showToast('请选择或输入违纪类型'); return; }
+    actualType = customVal;
+  }
+  if (currentStudentId === null) { showToast('请先选择学生'); return; }
+  const s = students[currentStudentId];
+  const desc = document.getElementById('viDescInput').value.trim() || '未填写描述';
+  const date = document.getElementById('viDateInput').value || '2026-09-08';
+  const dateFmt = date.replace(/^2026-0?/, '').replace('-', '月') + '日';
+  s.violations.unshift({
+    type: actualType,
+    desc: desc,
+    score: viScore,
+    isBonus: viIsBonus,
+    date: dateFmt,
+    photo: viPhotoData,
+  });
+  // Update conduct score
+  if (viIsBonus) {
+    s.conduct.d10 += viScore;
+    s.conduct.total += viScore;
+  } else {
+    s.conduct.d11 += viScore;
+    s.conduct.total -= viScore;
+  }
+  hideModal('violationModal');
+  showToast('已登记：' + s.name + ' ' + actualType + (viIsBonus?'+':'-') + viScore + '分');
+  initMStudentTable();
+  const tr = document.querySelectorAll('#mStudentTable tr')[currentStudentId];
+  if (tr) selectMStudent(s, tr);
+}
+
+// ========== Collection Form Modal ==========
+let cfSelectedType = null;
+let cfScore = 1;
+let cfIsBonus = false;
+let cfPhotoData = null;
+
+function showCollectionFormModal() {
+  // Reset to share section
+  document.getElementById('cfShareSection').style.display = '';
+  document.getElementById('cfFillSection').style.display = 'none';
+  document.getElementById('cfSubmitBtn').style.display = 'none';
+  // Populate student dropdown
+  const select = document.getElementById('cfStudentSelect');
+  select.innerHTML = '<option value="">请选择学生...</option>' + students.map((s, i) => `<option value="${i}">${s.name} (${s.fullId})</option>`).join('');
+  // Reset form
+  cfSelectedType = null;
+  cfScore = 1;
+  cfIsBonus = false;
+  cfPhotoData = null;
+  document.querySelectorAll('#cfViolationTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('cfScoreInput').value = '1';
+  document.getElementById('cfScoreInput').style.color = 'var(--danger)';
+  document.getElementById('cfScoreLabel').textContent = '扣分';
+  document.getElementById('cfDescInput').value = '';
+  document.getElementById('cfPhotoPreview').style.display = 'none';
+  document.getElementById('cfPhotoPreview').src = '';
+  document.getElementById('cfUploadPlaceholder').style.display = '';
+  document.querySelector('.cf-upload-area').classList.remove('has-photo');
+  showModal('collectionFormModal');
+  const url = getShareUrl('collect');
+  document.getElementById('cfLinkText').textContent = url;
+  setTimeout(() => genQrcode('cfQrcode', url), 100);
+}
+
+function openCollectionForm() {
+  document.getElementById('cfShareSection').style.display = 'none';
+  document.getElementById('cfFillSection').style.display = '';
+  document.getElementById('cfSubmitBtn').style.display = 'inline-flex';
+}
+
+function backToShareSection() {
+  document.getElementById('cfShareSection').style.display = '';
+  document.getElementById('cfFillSection').style.display = 'none';
+  document.getElementById('cfSubmitBtn').style.display = 'none';
+}
+
+function selectCfType(el, type) {
+  document.querySelectorAll('#cfViolationTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  const customInput = document.getElementById('cfCustomInput');
+  if (type === '更多') {
+    customInput.style.display = '';
+    customInput.focus();
+    cfSelectedType = '';
+  } else {
+    customInput.style.display = 'none';
+    customInput.value = '';
+    cfSelectedType = type;
+  }
+  cfIsBonus = false;
+  cfScore = 1;
+  document.getElementById('cfScoreInput').value = '1';
+  document.getElementById('cfScoreInput').style.color = 'var(--danger)';
+  document.getElementById('cfScoreLabel').textContent = '扣分';
+}
+
+function adjustCfScore(delta) {
+  cfScore = Math.max(1, cfScore + delta);
+  document.getElementById('cfScoreInput').value = cfScore;
+}
+
+function previewCfPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    cfPhotoData = e.target.result;
+    const preview = document.getElementById('cfPhotoPreview');
+    const placeholder = document.getElementById('cfUploadPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    document.querySelector('.cf-upload-area').classList.add('has-photo');
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitCollectionForm() {
+  const studentIdx = document.getElementById('cfStudentSelect').value;
+  if (!studentIdx && studentIdx !== '0') { showToast('请选择学生'); return; }
+  let actualType = cfSelectedType;
+  if (!actualType) {
+    const customVal = document.getElementById('cfCustomInput').value.trim();
+    if (!customVal) { showToast('请选择或输入违纪类型'); return; }
+    actualType = customVal;
+  }
+  const s = students[parseInt(studentIdx)];
+  const timeVal = document.getElementById('cfTimeInput').value;
+  // Format time as "9月8日 14:30"
+  const timeFmt = timeVal.replace(/^2026-0?/, '').replace(/-(\d+)-/, '月$1日 ').replace(/T/, '');
+  const desc = document.getElementById('cfDescInput').value.trim() || '未填写描述';
+  s.violations.unshift({
+    type: actualType,
+    desc: desc,
+    score: cfScore,
+    isBonus: cfIsBonus,
+    date: timeFmt,
+    photo: cfPhotoData,
+  });
+  if (cfIsBonus) {
+    s.conduct.d10 += cfScore;
+    s.conduct.total += cfScore;
+  } else {
+    s.conduct.d11 += cfScore;
+    s.conduct.total -= cfScore;
+  }
+  hideModal('collectionFormModal');
+  showToast('收集表已提交！数据已汇总至' + s.name + '的档案');
+  initMStudentTable();
+  const tr = document.querySelectorAll('#mStudentTable tr')[students.indexOf(s)];
+  if (tr) selectMStudent(s, tr);
+}
+
+// ========== Conduct Collection Form ==========
+let ccSelectedDim = null;
+let ccDimType = '';
+let ccScore = 1;
+let ccPhotoData = null;
+
+const ccDimNames = {
+  d1:'黑板报', d2:'好人好事', d3:'志愿者', d4:'班干部',
+  d5:'团体活动', d6:'班级卫生', d7:'宿舍/手机', d8:'晚修纪律',
+  d9:'课堂/作业', d10:'课堂加分', d11:'出勤/仪容'
+};
+
+function showCcShareSheet() {
+  document.getElementById('ccShareSection').style.display = '';
+  document.getElementById('ccFillSection').style.display = 'none';
+  document.getElementById('ccSubmitBtn').style.display = 'none';
+  const select = document.getElementById('ccStudentSelect');
+  select.innerHTML = '<option value="">请选择学生...</option>' + students.map((s,i)=>`<option value="${i}">${s.name} (${s.fullId})</option>`).join('');
+  ccSelectedDim = null;
+  ccDimType = '';
+  ccScore = 1;
+  ccPhotoData = null;
+  document.querySelectorAll('#ccDimTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('ccScoreInput').value = '1';
+  document.getElementById('ccDescInput').value = '';
+  document.getElementById('ccPhotoPreview').style.display = 'none';
+  document.getElementById('ccUploadPlaceholder').style.display = '';
+  document.getElementById('ccScoreType').textContent = '分';
+  document.getElementById('ccScoreType').style.color = '';
+  showModal('conductCollectModal');
+  const url = getShareUrl('conduct');
+  document.getElementById('ccLinkText').textContent = url;
+  setTimeout(() => genQrcode('ccQrcode', url), 100);
+}
+
+function openCcFill() {
+  document.getElementById('ccShareSection').style.display = 'none';
+  document.getElementById('ccFillSection').style.display = '';
+  document.getElementById('ccSubmitBtn').style.display = 'block';
+}
+
+function backToCcShare() {
+  document.getElementById('ccShareSection').style.display = '';
+  document.getElementById('ccFillSection').style.display = 'none';
+  document.getElementById('ccSubmitBtn').style.display = 'none';
+}
+
+function selectCcDim(el, dim, type) {
+  document.querySelectorAll('#ccDimTypes .vi-type-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  ccSelectedDim = dim;
+  ccDimType = type;
+  ccScore = 1;
+  document.getElementById('ccScoreInput').value = '1';
+  const typeEl = document.getElementById('ccScoreType');
+  typeEl.textContent = type;
+  typeEl.style.color = type === '加分' ? 'var(--success-dark)' : 'var(--danger)';
+}
+
+function adjustCcScore(delta) {
+  ccScore = Math.max(1, ccScore + delta);
+  document.getElementById('ccScoreInput').value = ccScore;
+}
+
+function previewCcPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    ccPhotoData = e.target.result;
+    const preview = document.getElementById('ccPhotoPreview');
+    const placeholder = document.getElementById('ccUploadPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitCcForm() {
+  const studentIdx = document.getElementById('ccStudentSelect').value;
+  if (!studentIdx && studentIdx !== '0') { showToast('请选择学生'); return; }
+  if (!ccSelectedDim) { showToast('请选择录入维度'); return; }
+  const s = students[parseInt(studentIdx)];
+  const dimName = ccDimNames[ccSelectedDim];
+  s.conduct[ccSelectedDim] += ccScore;
+  if (ccDimType === '加分') {
+    s.conduct.total += ccScore;
+  } else {
+    s.conduct.total -= ccScore;
+  }
+  hideModal('conductCollectModal');
+  showToast('操行数据已提交！「' + dimName + '」' + (ccDimType==='加分'?'+':'-') + ccScore + '分 → ' + s.name);
+  initConductCards();
+  initMStudentTable();
+}
+
+// ========== Modal Helpers ==========
+function copyLink(elId) {
+  const text = document.getElementById(elId).textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast('链接已复制：' + text)).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function genQrcode(elId, text) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '';
+  try {
+    new QRCode(el, { text: text, width: el.offsetWidth || 100, height: el.offsetHeight || 100, correctLevel: QRCode.CorrectLevel.M });
+  } catch(e) {
+    el.innerHTML = '<div style="font-size:32px">📱</div><div style="font-size:11px;color:var(--text-3);margin-top:4px">二维码加载中</div>';
+  }
+}
+
+function getShareUrl(hash) {
+  var href = location.href.split('#')[0];
+  return decodeURI(href) + '#' + hash;
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showToast('链接已复制：' + text); }
+  catch(e) { showToast('复制失败，请手动选择链接复制'); }
+  document.body.removeChild(ta);
+}
+
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+function showClassSettingsSheet() { showModal('classSettingsSheet'); }
+function showSbConfigSheet() {
+  try {
+    var c = sbConfig();
+    document.getElementById('mSbUrlInput').value = c.url;
+    document.getElementById('mSbAnonInput').value = c.anon;
+    document.getElementById('mSbStatus').textContent = sbEnabled() ? '当前已启用云端同步 ✓' : '';
+  } catch(e){}
+  showModal('sbConfigSheet');
+}
+function saveSbConfigMobile() {
+  var url = document.getElementById('mSbUrlInput').value.trim().replace(/\/+$/, '');
+  var anon = document.getElementById('mSbAnonInput').value.trim();
+  var status = document.getElementById('mSbStatus');
+  if (!url || !anon) { status.textContent = '请填写完整的 Project URL 和 anon key'; return; }
+  try { localStorage.setItem('smartclass_supabase_url', url); localStorage.setItem('smartclass_supabase_anon', anon); } catch(e){}
+  status.textContent = '已保存并启用云端同步 ✓';
+  // 保存后立即拉取云端数据合并到本地展示
+  try { applyCloudRecords(); syncMTodosFromCloud(); applyCloudScores(); applyCloudConductWeeks(); renderHomeConductCard(); } catch(e){}
+  setTimeout(function(){ hideModal('sbConfigSheet'); }, 800);
+  showToast('云端同步已启用');
+}
+
+function toggleClassMenu() {
+  const dd = document.getElementById('classDropdown');
+  dd.style.display = dd.style.display === 'none' ? '' : 'none';
+}
+
+// Close class dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('classDropdown');
+  const btn = document.getElementById('topbarClassBtn');
+  if (dd && dd.style.display !== 'none' && !dd.contains(e.target) && !btn.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+function showRosterUploadSheet() {
+  document.getElementById('mRosterPlaceholder').style.display = '';
+  document.getElementById('mRosterResult').style.display = 'none';
+  document.getElementById('mRosterResult').innerHTML = '';
+  document.getElementById('mRosterUploadArea').classList.remove('has-photo');
+  showModal('rosterUploadSheet');
+}
+
+function handleMRosterUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fileName = file.name;
+  const area = document.getElementById('mRosterUploadArea');
+  const placeholder = document.getElementById('mRosterPlaceholder');
+  const result = document.getElementById('mRosterResult');
+  placeholder.style.display = 'none';
+  result.style.display = '';
+  result.innerHTML = `
+    <div style="text-align:left">
+      <div style="font-size:28px">✅</div>
+      <div style="font-size:14px;font-weight:600;color:var(--success-dark);margin-top:4px">名单上传成功！</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:4px">文件：${fileName}</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:2px">解析到 <b style="color:var(--success-dark)">${students.length}</b> 名学生</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:2px">已同步至：学生档案 · 考勤点名 · 品德操行</div>
+    </div>
+  `;
+  area.classList.add('has-photo');
+  document.getElementById('mRosterStatusTag').textContent = '已加载 ' + students.length + '人';
+  showToast('名单已上传，已同步至学生档案和考勤点名');
+  initMStudentTable();
+  initMAttendance();
+}
+function showShareModal() {
+  showModal('shareModal');
+  var hrefBase = location.href.split('#')[0];
+  var cBase = getCollectBaseUrl(); // 公网收集表基址(本手机端点名页也传在同一位置)
+  var file = '智慧班级管家_手机端.html';
+  var url;
+  if (cBase) {
+    url = cBase + encodeURIComponent(file) + (sbParam() || '') + '#attendance';
+  } else {
+    url = hrefBase + (sbParam() || '') + '#attendance';
+  }
+  document.getElementById('attLinkText').textContent = url;
+  setTimeout(() => genQrcode('mAttendanceQrcode', url), 100);
+}
+function showExportAbsentModal() { showModal('exportAbsentModal'); }
+
+function showPhotoPreview(src) {
+  let overlay = document.getElementById('photoPreviewOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'photoPreviewOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick = function() { overlay.style.display = 'none'; };
+    const img = document.createElement('img');
+    img.id = 'photoPreviewImg';
+    img.style.cssText = 'max-width:100%;max-height:100%;border-radius:8px';
+    overlay.appendChild(img);
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('photoPreviewImg').src = src;
+  overlay.style.display = 'flex';
+}
+function showPhotoUploadModal() { showModal('photoUploadModal'); }
+function showNoticeModal() { showModal('noticeModal'); }
+
+let efFormat = 'ids';
+function selectEf(el, fmt) {
+  document.querySelectorAll('.ef-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  efFormat = fmt;
+}
+
+function copyAbsentList() {
+  const absent = students.filter(s => mAttStates[s.id] === 'absent');
+  let text = efFormat === 'ids' ? absent.map(s=>s.id).join(', ') : absent.map(s=>`${s.id}-${s.name}`).join(', ');
+  showToast('已复制：' + (text || '无缺席学生'));
+  hideModal('exportAbsentModal');
+}
+
+// ========== 值日生 Duty (手机端) ==========
+const DUTY_KEY = 'zhbj_duty_schedule';
+const DUTY_ROLES = ['扫地','拖地（摆桌子）','擦黑板、关多媒体','走廊/窗台/开关空调、灯','讲台地面、玻璃'];
+const DUTY_DAY_NAMES = {0:'星期天',1:'星期一',2:'星期二',3:'星期三',4:'星期四',5:'星期五',6:'星期六'};
+
+function mCleanNames(v){
+  if(v==null) return '';
+  return String(v).replace(/[\n\r]+/g,'、').replace(/[，;,；]+/g,'、').replace(/[\s]+/g,'').replace(/^、+|、+$/g,'');
+}
+function mLoadDuty(){
+  try{ const d=localStorage.getItem(DUTY_KEY); return d? JSON.parse(d): []; }catch(e){ return []; }
+}
+function mTodayDutyName(){ return DUTY_DAY_NAMES[new Date().getDay()]; }
+function mDutyPeopleCount(items){ return items.reduce((s,it)=>s + (it.people? it.people.split('、').filter(Boolean).length:0),0); }
+function mRenderDuty(){
+  const wrap=document.getElementById('dutyDayTag'), cnt=document.getElementById('dutyCount'), prev=document.getElementById('dutyPreview');
+  if(!wrap||!cnt||!prev) return;
+  const duty=mLoadDuty(), dayName=mTodayDutyName();
+  const today=duty.find(d=>d.label.indexOf(dayName)>=0)||null;
+  wrap.textContent = today? dayName : (duty.length? dayName+'（未安排）':'待定');
+  let countText='—', preview='点击查看 / 上传值日表';
+  if(today){
+    countText = mDutyPeopleCount(today.items)+' 人';
+    const first=today.items.find(it=>it.people);
+    preview = first? (first.role+'：'+first.people) : '当日无分工';
+  }
+  cnt.textContent=countText;
+  prev.textContent=(today? '今日 ':'') + preview;
+}
+function mDutyDayHtml(d){
+  const today=mTodayDutyName();
+  const isToday=d.label.indexOf(today)>=0;
+  const body=d.items.filter(it=>it.people).map(it=>`<div class="duty-row"><span class="duty-role">${it.role}</span><span class="duty-people">${it.people}</span></div>`).join('')
+    || '<div style="color:var(--text-3);font-size:12px">（未安排）</div>';
+  return `<div class="duty-day${isToday?' is-today':''}"><div class="duty-day-head">${d.label}${isToday?'<span class="tag tag-red">今天</span>':''}</div>${body}</div>`;
+}
+function mRenderDutyWeek(){
+  const wrap=document.getElementById('mDutyWeekView');
+  if(!wrap) return;
+  const duty=mLoadDuty();
+  if(!duty.length){ wrap.innerHTML='<div style="text-align:center;padding:24px 12px;color:var(--text-3);font-size:13px">尚未上传值日表，请点击上方上传 Excel 自动识别本周分工</div>'; return; }
+  wrap.innerHTML='<div style="font-size:11px;color:var(--text-3);margin-bottom:8px">分工：人员 · 高亮为今天</div>'+duty.map(mDutyDayHtml).join('');
+}
+function openDutySheet(){
+  const duty=mLoadDuty();
+  const area=document.getElementById('mDutyResult'), ph=document.getElementById('mDutyPlaceholder');
+  if(duty.length){ ph.style.display='none'; area.style.display='';
+    area.innerHTML=`<div style="font-size:12px;color:var(--success-dark);padding:4px 0">{clone} 共 ${duty.length} 天 · 点击上方可重新上传</div>`.replace('{clone}','✅');
+  }
+  mRenderDutyWeek();
+  showModal('dutySheet');
+}
+function handleMDutyUpload(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      if(typeof XLSX==='undefined'){ showToast('表格解析库未加载，请检查网络'); return; }
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      let duty=[], colRoles=DUTY_ROLES;
+      const kw=['扫地','拖地','擦黑板','讲台','走廊','窗台'];
+      for(let i=0;i<rows.length;i++){
+        const r=rows[i]||[];
+        if(r.some(c=>kw.some(k=>String(c).indexOf(k)>=0))){ const rr=r.map(c=>String(c).trim()).filter(s=>s); if(rr.length>=2) colRoles=rr.slice(1); break; }
+      }
+      for(let i=0;i<rows.length;i++){
+        const r=(rows[i]||[]).map(c=>c==null?'':String(c).trim());
+        const label=r[0];
+        if(!label || label.indexOf('星期')<0) continue;
+        const items=[];
+        for(let ci=1;ci<r.length && ci<=colRoles.length;ci++){
+          const p=mCleanNames(r[ci]);
+          items.push({role:colRoles[ci-1], people:p||null});
+        }
+        duty.push({label, items});
+      }
+      if(!duty.length){ showToast('未能识别值日表，请确保表格含“星期X”和分工列'); return; }
+      localStorage.setItem(DUTY_KEY,JSON.stringify(duty));
+      const area=document.getElementById('mDutyResult'), ph=document.getElementById('mDutyPlaceholder');
+      ph.style.display='none'; area.style.display='';
+      area.innerHTML=`<div style="font-size:12px;color:var(--success-dark);padding:4px 0">✅ 解析成功：${file.name} · ${duty.length} 天分工</div>`;
+      mRenderDuty(); mRenderDutyWeek();
+      showToast('值日表解析成功，首页已更新');
+    }catch(err){ console.error(err); showToast('解析失败：'+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ========== Toast ==========
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ========== Init ==========
+document.addEventListener('DOMContentLoaded', () => {
+  mRenderDuty();
+  initMAttendance();
+  initConductCards();
+  initMStudentTable();
+  updateTopbar('home');
+  setTimeout(function() {
+    try {
+      var rawHash = location.hash;
+      var hash = rawHash.replace(/^#/, '');
+      if (!hash) return;
+      if (hash === 'attendance') { switchPage('attendance'); }
+      else if (hash === 'collect') { renderStandaloneForm('violation'); }
+      else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+    } catch(e) { console.error('路由错误:', e); }
+  }, 300);
+});
+
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    try {
+      var hash = location.hash.replace(/^#/, '');
+      if (!hash) return;
+      if (hash === 'attendance') { switchPage('attendance'); }
+      else if (hash === 'collect') { renderStandaloneForm('violation'); }
+      else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+    } catch(e) { console.error('load路由错误:', e); }
+  }, 500);
+});
+
+window.addEventListener('hashchange', function() {
+  try {
+    var hash = location.hash.replace(/^#/, '');
+    if (!hash) return;
+    if (hash === 'attendance') { switchPage('attendance'); }
+    else if (hash === 'collect') { renderStandaloneForm('violation'); }
+    else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+  } catch(e) { console.error('hashchange路由错误:', e); }
+});
+
+// ========== Standalone Form (for shared links) ==========
+function renderStandaloneForm(type) {
+  document.body.classList.add('standalone-form');
+  document.body.style.overflow = 'auto';
+  var phoneEl = document.querySelector('.phone-frame');
+  if (phoneEl) phoneEl.style.display = 'none';
+  var container = document.getElementById('standaloneFormView');
+  var isViolation = type === 'violation';
+  var title = isViolation ? '📋 违纪记录收集表' : '📊 品德操行数据收集表';
+  var subtitle = isViolation ? '班干部填写违纪情况，提交后自动汇总至学生档案' : '班干部填写操行数据，提交后自动汇总至操行表格';
+
+  var studentOptions = '<option value="">请选择学生...</option>' + students.map(function(s, i) {
+    return '<option value="' + i + '">' + s.name + ' (' + s.fullId + ')</option>';
+  }).join('');
+
+  var typeOptions = isViolation ? [
+    {key:'晚修手机未交', dim:'violation'}, {key:'宿舍手机未交', dim:'violation'},
+    {key:'旷课', dim:'violation'}, {key:'更多（自定义）', dim:'custom'}
+  ] : [
+    {key:'1.黑板报', dim:'d1', scoreType:'加分'}, {key:'2.好人好事', dim:'d2', scoreType:'加分'},
+    {key:'3.志愿者', dim:'d3', scoreType:'加分'}, {key:'4.班干部', dim:'d4', scoreType:'加分'},
+    {key:'5.团体活动', dim:'d5', scoreType:'加分'}, {key:'6.班级卫生', dim:'d6', scoreType:'减分'},
+    {key:'7.宿舍/手机', dim:'d7', scoreType:'减分'}, {key:'8.晚修纪律', dim:'d8', scoreType:'减分'},
+    {key:'9.课堂/作业', dim:'d9', scoreType:'减分'}, {key:'10.课堂加分', dim:'d10', scoreType:'加分'},
+    {key:'11.出勤/仪容', dim:'d11', scoreType:'减分'}
+  ];
+
+  var typeHtml = typeOptions.map(function(t, i) {
+    return '<div class="vi-type-option" data-idx="' + i + '" onclick="selectStandaloneType(this, ' + i + ', ' + JSON.stringify(t).replace(/"/g, '&quot;') + ')">' + t.key + '</div>';
+  }).join('');
+
+  var dateField = isViolation ?
+    '<div class="sfv-section"><label><span class="req">*</span>违纪时间</label><input type="datetime-local" id="sfvDate"></div>' : '';
+
+  container.innerHTML =
+    '<div class="sfv-header"><h2>' + title + '</h2><p>' + subtitle + '</p></div>' +
+    '<div class="sfv-section"><label><span class="req">*</span>1. 选择学生</label><select id="sfvStudent">' + studentOptions + '</select></div>' +
+    dateField +
+    '<div class="sfv-section"><label><span class="req">*</span>' + (isViolation ? '2. 选择违纪类型' : '2. 选择录入维度') + '</label><div class="sfv-types" id="sfvTypes">' + typeHtml + '</div>' +
+    (isViolation ? '<input type="text" id="sfvCustomInput" placeholder="请输入自定义违纪类型..." style="display:none;margin-top:8px">' : '') +
+    '</div>' +
+    '<div class="sfv-section"><label><span class="req">*</span>' + (isViolation ? '3. 违纪描述' : '3. 填写数据') + '</label><textarea id="sfvDesc" rows="3" placeholder="' + (isViolation ? '描述违纪具体情况...' : '描述具体情况...') + '"></textarea></div>' +
+    '<div class="sfv-section"><label>' + (isViolation ? '4. 扣分' : '分值') + '</label><div class="sfv-score-row"><button class="btn btn-outline btn-sm" onclick="adjustStandaloneScore(-1)">−</button><input type="text" id="sfvScore" value="1" readonly><button class="btn btn-outline btn-sm" onclick="adjustStandaloneScore(1)">+</button><span id="sfvScoreType" style="font-size:12px;color:var(--text-3);margin-left:4px">分</span></div></div>' +
+    '<div class="sfv-section"><label>上传图片佐证（可选）</label><div class="sfv-upload" onclick="document.getElementById(\'sfvPhotoInput\').click()"><div id="sfvUploadPlaceholder"><div style="font-size:32px">📸</div><div style="font-size:12px;color:var(--text-3);margin-top:4px">点击拍照或选择图片</div></div><img id="sfvPhotoPreview" style="display:none;width:100%;border-radius:8px;margin-top:4px"></div><input type="file" id="sfvPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewStandalonePhoto(this)"></div>' +
+    '<button class="sfv-submit" onclick="submitStandaloneForm(' + (isViolation ? 'true' : 'false') + ')">提交</button>';
+}
+
+var sfvSelectedType = null;
+var sfvScore = 1;
+var sfvScoreType = '分';
+var sfvPhotoData = null;
+
+function selectStandaloneType(el, idx, typeInfo) {
+  document.querySelectorAll('#sfvTypes .vi-type-option').forEach(function(o) { o.classList.remove('selected'); });
+  el.classList.add('selected');
+  sfvSelectedType = typeInfo;
+  sfvScore = 1;
+  document.getElementById('sfvScore').value = '1';
+  var customInput = document.getElementById('sfvCustomInput');
+  if (customInput) {
+    customInput.style.display = typeInfo.dim === 'custom' ? 'block' : 'none';
+    if (typeInfo.dim !== 'custom') customInput.value = '';
+  }
+  var typeEl = document.getElementById('sfvScoreType');
+  if (typeInfo.scoreType) {
+    sfvScoreType = typeInfo.scoreType;
+    typeEl.textContent = typeInfo.scoreType;
+    typeEl.style.color = typeInfo.scoreType === '加分' ? 'var(--success-dark)' : 'var(--danger)';
+  }
+}
+
+function adjustStandaloneScore(delta) {
+  sfvScore = Math.max(1, sfvScore + delta);
+  document.getElementById('sfvScore').value = sfvScore;
+}
+
+function previewStandalonePhoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    sfvPhotoData = e.target.result;
+    var preview = document.getElementById('sfvPhotoPreview');
+    var placeholder = document.getElementById('sfvUploadPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function submitStandaloneForm(isViolation) {
+  var studentIdx = document.getElementById('sfvStudent').value;
+  if (!studentIdx && studentIdx !== '0') { showToast('请选择学生'); return; }
+  if (!sfvSelectedType) { showToast('请选择类型'); return; }
+  var s = students[parseInt(studentIdx)];
+  var desc = document.getElementById('sfvDesc').value.trim() || '未填写描述';
+
+  if (isViolation) {
+    var typeName = sfvSelectedType.key;
+    if (sfvSelectedType.dim === 'custom') {
+      typeName = document.getElementById('sfvCustomInput').value.trim();
+      if (!typeName) { showToast('请输入自定义违纪类型'); return; }
+    }
+    var dateVal = document.getElementById('sfvDate') ? document.getElementById('sfvDate').value : '';
+    var dateStr = dateVal ? dateVal.replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
+    s.violations.push({ date: dateStr, type: typeName, desc: desc, score: -sfvScore, photo: sfvPhotoData });
+    s.conduct.total -= sfvScore;
+    if (typeName.indexOf('晚修') !== -1 || typeName.indexOf('手机') !== -1) s.conduct.d7 += sfvScore;
+    else if (typeName.indexOf('旷课') !== -1) s.conduct.d11 += sfvScore;
+    else s.conduct.d9 += sfvScore;
+  } else {
+    var dim = sfvSelectedType.dim;
+    s.conduct[dim] += sfvScore;
+    if (sfvSelectedType.scoreType === '加分') s.conduct.total += sfvScore;
+    else s.conduct.total -= sfvScore;
+  }
+
+  var container = document.getElementById('standaloneFormView');
+  container.innerHTML =
+    '<div class="sfv-success"><div class="icon">✅</div><h3>提交成功！</h3><p>' + s.name + ' 的数据已记录</p>' +
+    '<p style="margin-top:16px"><button class="sfv-submit" style="margin-top:16px" onclick="renderStandaloneForm(\'' + (isViolation ? 'violation' : 'conduct') + '\')">继续填写</button></p></div>';
+}
+</script>
+<script>
+// Immediate hash route check (after all scripts loaded)
+(function() {
+  var hash = location.hash.replace(/^#/, '');
+  if (!hash) return;
+  setTimeout(function() {
+    try {
+      if (typeof renderStandaloneForm === 'function') {
+        if (hash === 'collect') renderStandaloneForm('violation');
+        else if (hash === 'conduct') renderStandaloneForm('conduct');
+        else if (hash === 'attendance') showShareModal();
+      }
+    } catch(e) { console.error('immediate route error:', e); }
+  }, 100);
+})();
+</script>
+
+
+</body></html>
