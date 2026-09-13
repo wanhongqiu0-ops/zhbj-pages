@@ -86,6 +86,8 @@ for (let i = 0; i < 58; i++) {
 // 配置存于 localStorage，由 PC 端“Supabase配置”入口写入。
 var SB_URL_KEY = 'smartclass_supabase_url';
 var SB_ANON_KEY = 'smartclass_supabase_anon';
+var SB_DEFAULT_URL = 'https://sjkvtsgqkzbhkzwpwsvd.supabase.co';
+var SB_DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqa3Z0c2dxa3piaGt6d3B3c3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcyMjgsImV4cCI6MjEwNDYyMzIyOH0.FYnAwcTXvAZ1kVQKmF9LGDAfhfH3ycjua1D2xCeziv8';
 function sbConfig() {
   try {
     // 优先读取分发链接 URL 参数携带的配置（?sbUrl=...&sbKey=...）
@@ -100,8 +102,8 @@ function sbConfig() {
         return { url: u, anon: k };
       }
     }
-    return { url: localStorage.getItem(SB_URL_KEY) || '', anon: localStorage.getItem(SB_ANON_KEY) || '' };
-  } catch(e) { return { url: '', anon: '' }; }
+    return { url: localStorage.getItem(SB_URL_KEY) || SB_DEFAULT_URL, anon: localStorage.getItem(SB_ANON_KEY) || SB_DEFAULT_KEY };
+  } catch(e) { return { url: SB_DEFAULT_URL, anon: SB_DEFAULT_KEY }; }
 }
 function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
 // 通过 PostgREST 向 Supabase 表插入一条记录（匿名+RLS）

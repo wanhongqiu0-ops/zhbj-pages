@@ -3,6 +3,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>智慧班级管家 - 手机端</title>
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -355,6 +358,12 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 }
 .att-toolbar .btn { flex: 1; min-width: 0; }
 
+/* ---- 考勤：日期选择 / 记录 / 分享锁定 ---- */
+.att-rec-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.att-rec-bar input[type=date] { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; box-sizing: border-box; background: #fff; }
+.att-rec-list { margin-bottom: 12px; }
+.attendance-locked .tabbar { display: none !important; }
+.attendance-locked #topbarBack { visibility: hidden; pointer-events: none; }
 .attendance-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -983,6 +992,13 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
 
       <!-- ========== Page: Attendance ========== -->
       <div class="page" id="page-attendance">
+        <div class="att-rec-bar">
+          <input type="date" id="mAttDateInput" onchange="onMAttDateChange()" title="选择考勤日期">
+          <button class="btn btn-outline btn-sm" onclick="saveMAttRecord()">💾 保存</button>
+          <button class="btn btn-outline btn-sm" onclick="collapseMAtt()">收起/展开</button>
+          <button class="btn btn-outline btn-sm" onclick="renderMAttRecords()">📋 记录</button>
+        </div>
+        <div class="att-rec-list" id="mAttRecList" style="display:none"></div>
         <div class="att-stats" id="attStats">
           <div class="att-stat total"><div class="as-num" id="mAttTotal">58</div><div class="as-label">应到</div></div>
           <div class="att-stat present"><div class="as-num" id="mAttPresent">0</div><div class="as-label">已核销</div></div>
@@ -1363,7 +1379,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
             <button class="btn btn-outline btn-sm" style="flex:1">⬇ 下载模板</button>
             <button class="btn btn-outline btn-sm" style="flex:1">⬆ 上传模板</button>
           </div>
-          <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="openConductCollect()">📤 收集表链接</button>
+          <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="showCcShareSheet()">📤 品德操行收集表 · 扫码分发</button>
           <div class="conduct-card-list" id="conductCardList"></div>
         </div>
 
@@ -1393,7 +1409,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
           <input type="text" class="form-input" placeholder="搜索学号/姓名..." style="flex:1">
           <button class="btn btn-primary btn-sm" onclick="showPhotoUploadModal()">📷 上传</button>
         </div>
-        <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="openViolationCollect()">🔗 违纪记录收集表（分享链接）</button>
+        <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="showCollectionFormModal()">🔗 违纪记录收集表 · 扫码分发</button>
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
           <span class="tag tag-blue" style="cursor:pointer">全部 58</span>
           <span class="tag tag-gray" style="cursor:pointer">已上传照片 15</span>
@@ -1628,7 +1644,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <div class="modal-body">
           <p style="font-size:12px;color:var(--text-3);margin-bottom:12px">配置后，考勤点名、品德操行、违纪收集、工作台待办等数据将写入云端，PC 端与手机端自动同步，分发的收集表/考勤链接任意设备可提交回传。</p>
           <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Supabase Project URL</label>
-          <input type="text" id="mSbUrlInput" class="form-input" placeholder="https://zhbj-api.784558474.workers.dev" style="font-size:13px;padding:10px 12px;margin-bottom:10px;width:100%;border:1px solid var(--border);border-radius:8px">
+          <input type="text" id="mSbUrlInput" class="form-input" placeholder="https://sjkvtsgqkzbhkzwpwsvd.supabase.co" style="font-size:13px;padding:10px 12px;margin-bottom:10px;width:100%;border:1px solid var(--border);border-radius:8px">
           <label style="display:block;font-size:12px;color:var(--text-2);margin-bottom:4px">Supabase anon public key</label>
           <input type="text" id="mSbAnonInput" class="form-input" placeholder="eyJhbGciOi..." style="font-size:13px;padding:10px 12px;margin-bottom:6px;width:100%;border:1px solid var(--border);border-radius:8px">
           <div style="font-size:11px;color:var(--text-3);margin-top:6px" id="mSbStatus"></div>
@@ -2146,10 +2162,13 @@ students.forEach(s => {
 // 配置存于 localStorage，由 PC 端“数据同步配置”入口写入，手机端读取同一配置。
 var SB_URL_KEY = 'smartclass_supabase_url';
 var SB_ANON_KEY = 'smartclass_supabase_anon';
+var SB_DEFAULT_URL = 'https://sjkvtsgqkzbhkzwpwsvd.supabase.co';
+var SB_DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqa3Z0c2dxa3piaGt6d3B3c3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcyMjgsImV4cCI6MjEwNDYyMzIyOH0.FYnAwcTXvAZ1kVQKmF9LGDAfhfH3ycjua1D2xCeziv8';
 function sbConfig() {
   try {
-    return { url: localStorage.getItem(SB_URL_KEY) || '', anon: localStorage.getItem(SB_ANON_KEY) || '' };
-  } catch(e) { return { url: '', anon: '' }; }
+    var raw = localStorage.getItem(SB_URL_KEY) || SB_DEFAULT_URL;
+    return { url: raw.replace(/\/rest\/.*$/i, ''), anon: localStorage.getItem(SB_ANON_KEY) || SB_DEFAULT_KEY };
+  } catch(e) { return { url: SB_DEFAULT_URL, anon: SB_DEFAULT_KEY }; }
 }
 function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
 function sbFetch(table, cb) {
@@ -2359,7 +2378,7 @@ function todayStr() {
 // 考勤：手机端点名页加载时拉取当日云端结果，与本地 mAttStates 合并
 function applyCloudMAttendance() {
   if (!sbEnabled() || typeof mAttStates === 'undefined') return;
-  sbFetchWhere('attendance_records', 'att_date=eq.' + todayStr(), function(rows) {
+  sbFetchWhere('attendance_records', 'att_date=eq.' + mAttDate, function(rows) {
     (rows||[]).forEach(function(r) {
       if (mAttStates[r.full_id] !== undefined && r.status) mAttStates[r.full_id] = r.status;
     });
@@ -2501,7 +2520,14 @@ function switchPage(page) {
   // Scroll to top
   document.querySelector('.content').scrollTop = 0;
   // 切回首页时刷新操行分卡片并从云端拉取最新（无需刷新页面）
-  if (page === 'home') { try { applyCloudConductWeeks(); } catch(e){} try { renderHomeConductCard(); } catch(e){} }
+  if (page === 'home') {
+    try { applyCloudConductWeeks(); } catch(e){} try { renderHomeConductCard(); } catch(e){}
+    try {
+      applyCloudRecords();   // 操行/违纪收集数据
+      syncMTodosFromCloud(); // PC端新增/勾选待办实时同步显示
+      applyCloudScores();    // PC端录入成绩/考证同步显示
+    } catch(e){}
+  }
   // Init charts
   if (page === 'conduct') {
     const kanbanVisible = document.getElementById('conductKanbanMode').style.display !== 'none';
@@ -2564,7 +2590,7 @@ function addTodo() {
   const text = input.value.trim();
   const list = input.parentElement;
   const div = document.createElement('div');
-  const id = 't_' + Date.now();
+  const id = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){ var r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16); }));
   div.className = 'todo-item';
   div.dataset.id = id;
   div.innerHTML = `<div class="todo-check" onclick="toggleTodo(this)"></div><div class="todo-content"><div class="todo-title">${text}</div><div class="todo-meta">刚刚添加</div></div>`;
@@ -2580,6 +2606,51 @@ function addTodo() {
 // ========== Attendance ==========
 let mAttStates = {};
 let mAttEnded = false;
+let mAttDate = (function(){ var d=new Date(), m=('0'+(d.getMonth()+1)).slice(-2), day=('0'+d.getDate()).slice(-2); return d.getFullYear()+'-'+m+'-'+day; })();
+const M_ATT_LOCAL = 'smartclass_att_local';
+let mAttCollapsed = false;
+function mAttLocalLoad(){ try { return JSON.parse(localStorage.getItem(M_ATT_LOCAL))||{}; } catch(e){ return {}; } }
+function mAttLocalSave(map){ try { localStorage.setItem(M_ATT_LOCAL, JSON.stringify(map)); } catch(e){} }
+function setMAttDateInput(){ var inp=document.getElementById('mAttDateInput'); if(inp && inp.value!==mAttDate && mAttDate) inp.value=mAttDate; }
+function onMAttDateChange(){ var inp=document.getElementById('mAttDateInput'); if(!inp||!inp.value) return; mAttDate=inp.value; initMAttendance(); }
+function loadMAttDate(d){ mAttDate=d; var inp=document.getElementById('mAttDateInput'); if(inp) inp.value=d; var box=document.getElementById('mAttRecList'); if(box) box.style.display='none'; initMAttendance(); }
+function saveMAttRecord(){
+  var local=mAttLocalLoad(); var day=local[mAttDate]||{};
+  Object.keys(mAttStates).forEach(function(id){
+    var st=mAttStates[id]; if(st==='unchecked') return;
+    if(day[id]!==st) day[id]=st;
+  });
+  local[mAttDate]=day; mAttLocalSave(local);
+  if(sbEnabled && sbEnabled()){
+    Object.keys(day).forEach(function(id){
+      if(day[id]!=='unchecked') sbUpsert('attendance_records',{att_date:mAttDate,full_id:id,status:day[id]},'att_date,full_id');
+    });
+  }
+  showToast('已保存 '+mAttDate+' 的考勤记录');
+}
+function collapseMAtt(){
+  mAttCollapsed=!mAttCollapsed;
+  var grid=document.getElementById('mAttendanceGrid'), box=document.getElementById('mAttRecList');
+  if(grid) grid.style.display = mAttCollapsed ? 'none' : '';
+  if(box) box.style.display='none';
+}
+function renderMAttRecords(){
+  var box=document.getElementById('mAttRecList'); if(!box) return;
+  var local=mAttLocalLoad(), set={};
+  Object.keys(local).forEach(function(k){ if(local[k] && Object.keys(local[k]).length) set[k]=1; });
+  var dates=Object.keys(set).sort().reverse();
+  if(!dates.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:10px">暂无已保存的考勤记录</div>'; box.style.display=''; return; }
+  box.innerHTML=dates.map(function(d){
+    var map=local[d]||{}, p=0,l=0,a=0;
+    Object.keys(map).forEach(function(id){ var s=map[id]; if(s==='present')p++; else if(s==='leave')l++; else if(s==='absent')a++; });
+    return '<div onclick="loadMAttDate(\''+d+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:6px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px"><span>📅 '+d+(d===mAttDate?'（当前）':'')+'</span><span style="font-size:12px;color:var(--text-3)">到 '+p+' · 请 '+l+' · 缺 '+a+'</span></div>';
+  }).join('');
+  box.style.display='';
+}
+function enterAttendanceLock(){
+  document.body.classList.add('attendance-locked');
+  switchPage('attendance');
+}
 
 function initMAttendance() {
   const grid = document.getElementById('mAttendanceGrid');
@@ -2599,7 +2670,15 @@ function initMAttendance() {
     btn.onclick = () => cycleMAttendance(s.id);
     grid.appendChild(btn);
   });
+  // 按所选日期载入本地缓存
+  var lm=mAttLocalLoad(), dayMap=lm[mAttDate]||{};
+  Object.keys(dayMap).forEach(function(id){ if(mAttStates[id]!==undefined && dayMap[id]!=='unchecked') mAttStates[id]=dayMap[id]; });
+  Object.keys(mAttStates).forEach(function(id){
+    var btn=grid.querySelector('.att-btn[data-id="'+id+'"]');
+    if(btn){ btn.className='att-btn '+(mAttStates[id]||'unchecked'); var av=btn.querySelector('.att-avatar'); if(av){ var st=mAttStates[id]||''; av.style.background=st==='present'?'#389E0D':st==='leave'?'#FA8C16':st==='absent'?'#CF1322':'#1677FF'; } }
+  });
   updateMAttStats();
+  setMAttDateInput();
   applyCloudMAttendance();
 }
 
@@ -2620,9 +2699,10 @@ function cycleMAttendance(id) {
     else avatar.style.background = '#1677FF';
   }
   updateMAttStats();
-  // 同步到云端（班长/教师点名写入，教师端实时读取）
-  if (sbEnabled && sbEnabled() && next !== 'unchecked') {
-    sbUpsert('attendance_records', { att_date: todayStr(), full_id: id, status: next }, 'att_date,full_id');
+  // 保存到本地（按日期）并同步云端
+  if (next !== 'unchecked') {
+    var lm2=mAttLocalLoad(); var dm2=lm2[mAttDate]||{}; dm2[id]=next; lm2[mAttDate]=dm2; mAttLocalSave(lm2);
+    if (sbEnabled && sbEnabled()) sbUpsert('attendance_records', { att_date: mAttDate, full_id: id, status: next }, 'att_date,full_id');
   }
   // Haptic feedback simulation
   if (navigator.vibrate) navigator.vibrate(10);
@@ -3283,7 +3363,7 @@ function showSbConfigSheet() {
   showModal('sbConfigSheet');
 }
 function saveSbConfigMobile() {
-  var url = document.getElementById('mSbUrlInput').value.trim().replace(/\/+$/, '');
+  var url = document.getElementById('mSbUrlInput').value.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
   var anon = document.getElementById('mSbAnonInput').value.trim();
   var status = document.getElementById('mSbStatus');
   if (!url || !anon) { status.textContent = '请填写完整的 Project URL 和 anon key'; return; }
@@ -3344,7 +3424,7 @@ function showShareModal() {
   showModal('shareModal');
   var hrefBase = location.href.split('#')[0];
   var cBase = getCollectBaseUrl(); // 公网收集表基址(本手机端点名页也传在同一位置)
-  var file = '智慧班级管家_手机端.html';
+  var file = 'mobile.html';
   var url;
   if (cBase) {
     url = cBase + encodeURIComponent(file) + (sbParam() || '') + '#attendance';
@@ -3501,7 +3581,7 @@ document.addEventListener('DOMContentLoaded', () => {
       var rawHash = location.hash;
       var hash = rawHash.replace(/^#/, '');
       if (!hash) return;
-      if (hash === 'attendance') { switchPage('attendance'); }
+      if (hash === 'attendance') { enterAttendanceLock(); }
       else if (hash === 'collect') { renderStandaloneForm('violation'); }
       else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
     } catch(e) { console.error('路由错误:', e); }
@@ -3513,7 +3593,7 @@ window.addEventListener('load', function() {
     try {
       var hash = location.hash.replace(/^#/, '');
       if (!hash) return;
-      if (hash === 'attendance') { switchPage('attendance'); }
+      if (hash === 'attendance') { enterAttendanceLock(); }
       else if (hash === 'collect') { renderStandaloneForm('violation'); }
       else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
     } catch(e) { console.error('load路由错误:', e); }
@@ -3524,7 +3604,7 @@ window.addEventListener('hashchange', function() {
   try {
     var hash = location.hash.replace(/^#/, '');
     if (!hash) return;
-    if (hash === 'attendance') { switchPage('attendance'); }
+    if (hash === 'attendance') { enterAttendanceLock(); }
     else if (hash === 'collect') { renderStandaloneForm('violation'); }
     else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
   } catch(e) { console.error('hashchange路由错误:', e); }
@@ -3664,11 +3744,19 @@ function submitStandaloneForm(isViolation) {
       if (typeof renderStandaloneForm === 'function') {
         if (hash === 'collect') renderStandaloneForm('violation');
         else if (hash === 'conduct') renderStandaloneForm('conduct');
-        else if (hash === 'attendance') showShareModal();
+        else if (hash === 'attendance') { enterAttendanceLock(); }
       }
     } catch(e) { console.error('immediate route error:', e); }
   }, 100);
 })();
+// PWA: 注册 Service Worker（仅 HTTPS 环境生效）
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function (e) {
+      console.warn('SW register failed:', e);
+    });
+  });
+}
 </script>
 
 

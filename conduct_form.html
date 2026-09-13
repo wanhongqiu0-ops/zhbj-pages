@@ -88,6 +88,8 @@ for (let i = 0; i < 58; i++) {
 // 配置存于 localStorage，由 PC 端“Supabase配置”入口写入。
 var SB_URL_KEY = 'smartclass_supabase_url';
 var SB_ANON_KEY = 'smartclass_supabase_anon';
+var SB_DEFAULT_URL = 'https://sjkvtsgqkzbhkzwpwsvd.supabase.co';
+var SB_DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqa3Z0c2dxa3piaGt6d3B3c3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcyMjgsImV4cCI6MjEwNDYyMzIyOH0.FYnAwcTXvAZ1kVQKmF9LGDAfhfH3ycjua1D2xCeziv8';
 function sbConfig() {
   try {
     // 优先读取分发链接 URL 参数携带的配置（?sbUrl=...&sbKey=...）
@@ -102,8 +104,8 @@ function sbConfig() {
         return { url: u, anon: k };
       }
     }
-    return { url: localStorage.getItem(SB_URL_KEY) || '', anon: localStorage.getItem(SB_ANON_KEY) || '' };
-  } catch(e) { return { url: '', anon: '' }; }
+    return { url: localStorage.getItem(SB_URL_KEY) || SB_DEFAULT_URL, anon: localStorage.getItem(SB_ANON_KEY) || SB_DEFAULT_KEY };
+  } catch(e) { return { url: SB_DEFAULT_URL, anon: SB_DEFAULT_KEY }; }
 }
 function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
 // 通过 PostgREST 向 Supabase 表插入一条记录（匿名+RLS）
@@ -188,6 +190,33 @@ function showToast(msg) {
 var fpvSelectedType = null;
 var fpvScore = 1;
 var fpvPhotoData = null;
+var fpvWeek = null;   // 本次提交归属的周次（可选，默认当前周）
+
+// 计算当天所属学年第几周（ISO 周，第1周为含1月4日的周）
+function computeWeekOfYear(now) {
+  var d = new Date(now.getTime ? now.getTime() : now);
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+// 集合收集表周次区间为 1~20（学期周次），默认周钳制在此范围内保证可下拉选择
+function currentCollectWeek() {
+  var w = computeWeekOfYear(new Date());
+  return w < 1 ? 1 : (w > 20 ? 20 : w);
+}
+// 读取分发链接中的 ?week= 参数（若有则作为默认收集周），钳制到 1~20
+function collectWeekFromUrl() {
+  try {
+    var m = location.search.match(/[?&]week=([0-9]+)/i);
+    if (m) {
+      var w = parseInt(m[1], 10);
+      if (!isNaN(w) && w >= 1 && w <= 52) return Math.min(w, 20);
+    }
+  } catch(e){}
+  return null;
+}
 
 var typeOptions = [
   {key:'1.黑板报/广播稿', dim:'d1', scoreType:'加分'}, {key:'2.好人好事', dim:'d2', scoreType:'加分'},
@@ -203,6 +232,13 @@ function renderForm() {
   document.body.style.overflow = 'auto';
   var container = document.getElementById('formView');
 
+  // 周次下拉：第1~20周，默认当前周
+  var curW = collectWeekFromUrl() || currentCollectWeek();
+  var weekOptions = Array.apply(null, { length: 20 }).map(function(_, i) {
+    var w = i + 1;
+    return '<option value="' + w + '">第' + w + '周' + (w === curW ? '（本周）' : '') + '</option>';
+  }).join('');
+
   var studentOptions = '<option value="">请选择学生...</option>' + students.map(function(s, i) {
     return '<option value="' + i + '">' + s.name + ' (' + s.fullId + ')</option>';
   }).join('');
@@ -212,7 +248,8 @@ function renderForm() {
   }).join('');
 
   container.innerHTML =
-    '<div class="fpv-header"><h2>📊 品德操行数据收集表</h2><p>班干部填写操行数据，提交后自动汇总至操行表格</p></div>' +
+    '<div class="fpv-header"><h2>📊 品德操行数据收集表</h2><p>班干部填写操行数据，提交后按周汇总至操行表格记录</p></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>0. 选择所属周次</label><select id="fpvWeek">' + weekOptions + '</select><div style="font-size:11px;color:var(--text-3);margin-top:4px">提交的数据会计入所选周的操行表格记录，默认本周</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>1. 选择学生</label><select id="fpvStudent">' + studentOptions + '</select></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>2. 选择录入维度</label><div class="fpv-types" id="fpvTypes">' + typeHtml + '</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>3. 填写数据</label><textarea id="fpvDesc" rows="3" placeholder="描述具体情况，如：制作黑板报获一等奖..."></textarea></div>' +
@@ -223,6 +260,8 @@ function renderForm() {
   fpvSelectedType = null;
   fpvScore = 1;
   fpvPhotoData = null;
+  fpvWeek = curW;
+  document.getElementById('fpvWeek').value = fpvWeek;
 }
 
 function selectType(el, idx, typeInfo) {
@@ -264,6 +303,9 @@ function submitForm() {
   if (!fpvSelectedType) { showToast('请选择录入维度'); return; }
   var s = students[parseInt(studentIdx)];
   var desc = document.getElementById('fpvDesc').value.trim() || '未填写描述';
+  var weekEl = document.getElementById('fpvWeek');
+  if (fpvWeek === null) fpvWeek = collectWeekFromUrl() || currentCollectWeek();
+  var week = weekEl && weekEl.value ? weekEl.value : String(fpvWeek);
 
   var dim = fpvSelectedType.dim;
   s.conduct[dim] += fpvScore;
@@ -279,6 +321,7 @@ function submitForm() {
     scoreType: fpvSelectedType.scoreType,
     desc: desc,
     photo: fpvPhotoData,
+    week: String(week),
     ts: new Date().toISOString()
   });
   saveCollectRecords(records);
@@ -290,6 +333,7 @@ function submitForm() {
       full_id: s.fullId, name: s.name, dim: dim,
       score: fpvScore, score_type: fpvSelectedType.scoreType,
       description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
+      week: String(week),
       device: (navigator.userAgent || '').substring(0, 40)
     });
   }
