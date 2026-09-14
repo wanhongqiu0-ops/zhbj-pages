@@ -2694,6 +2694,8 @@ const pageFabs = { home: 'addTodo', attendance: null, conduct: null, students: '
 let pageHistory = ['home'];
 
 function switchPage(page) {
+  // 离开考勤页时解除“考勤锁定”，否则菜单栏会一直被隐藏（attendance-locked 是常驻类）
+  if (page !== 'attendance') document.body.classList.remove('attendance-locked');
   // Push to history if different from current
   const current = pageHistory[pageHistory.length - 1];
   if (page !== current) pageHistory.push(page);
@@ -2743,6 +2745,8 @@ function goBack() {
   if (pageHistory.length > 1) {
     pageHistory.pop();
     const prev = pageHistory[pageHistory.length - 1];
+    // 返回非考勤页时解除考勤锁定，恢复菜单栏
+    if (prev !== 'attendance') document.body.classList.remove('attendance-locked');
     // Switch without pushing to history again
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
     const tab = document.querySelector(`.tab-item[data-page="${prev}"]`);
@@ -4037,10 +4041,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       var rawHash = location.hash;
       var hash = rawHash.replace(/^#/, '');
-      if (!hash) return;
       if (hash === 'attendance') { enterAttendanceLock(); }
-      else if (hash === 'collect') { renderStandaloneForm('violation'); }
-      else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+      else {
+        document.body.classList.remove('attendance-locked');
+        if (hash === 'collect') { renderStandaloneForm('violation'); }
+        else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+      }
     } catch(e) { console.error('路由错误:', e); }
   }, 300);
 });
@@ -4049,10 +4055,12 @@ window.addEventListener('load', function() {
   setTimeout(function() {
     try {
       var hash = location.hash.replace(/^#/, '');
-      if (!hash) return;
       if (hash === 'attendance') { enterAttendanceLock(); }
-      else if (hash === 'collect') { renderStandaloneForm('violation'); }
-      else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+      else {
+        document.body.classList.remove('attendance-locked');
+        if (hash === 'collect') { renderStandaloneForm('violation'); }
+        else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+      }
     } catch(e) { console.error('load路由错误:', e); }
   }, 500);
 });
@@ -4060,10 +4068,12 @@ window.addEventListener('load', function() {
 window.addEventListener('hashchange', function() {
   try {
     var hash = location.hash.replace(/^#/, '');
-    if (!hash) return;
     if (hash === 'attendance') { enterAttendanceLock(); }
-    else if (hash === 'collect') { renderStandaloneForm('violation'); }
-    else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+    else {
+      document.body.classList.remove('attendance-locked');
+      if (hash === 'collect') { renderStandaloneForm('violation'); }
+      else if (hash === 'conduct') { renderStandaloneForm('conduct'); }
+    }
   } catch(e) { console.error('hashchange路由错误:', e); }
 });
 
