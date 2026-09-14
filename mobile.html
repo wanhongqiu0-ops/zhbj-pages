@@ -538,6 +538,7 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .cci-dim { display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); border-radius: var(--radius-xs); padding: 6px 10px; }
 .cci-dim .cd-label { font-size: 11px; color: var(--text-3); }
 .cci-dim .cd-val { font-size: 12px; font-weight: 600; }
+.cci-dim .cd-input { width: 46px; text-align: center; font-size: 13px; font-weight: 700; border: 1px solid var(--border-light); border-radius: 6px; background: #fff; padding: 2px 4px; }
 
 /* Conduct - Kanban Mode */
 .kanban-chart { height: 200px; }
@@ -1395,8 +1396,8 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <!-- Table Mode -->
         <div id="conductTableMode" style="display: none;">
           <div style="display:flex;gap:8px;margin-bottom:12px">
-            <button class="btn btn-outline btn-sm" style="flex:1">⬇ 下载模板</button>
-            <button class="btn btn-outline btn-sm" style="flex:1">⬆ 上传模板</button>
+            <button class="btn btn-outline btn-sm" style="flex:1" onclick="mDownloadConductTemplate()">⬇ 下载模板</button>
+            <button class="btn btn-outline btn-sm" style="flex:1" onclick="mUploadConductTemplate()">⬆ 上传模板</button>
           </div>
           <button class="btn btn-primary btn-block btn-sm" style="margin-bottom:12px" onclick="showCcShareSheet()">📤 品德操行收集表 · 扫码分发</button>
           <div class="conduct-card-list" id="conductCardList"></div>
@@ -1700,7 +1701,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
           </div>
           <div class="form-group">
             <label class="form-label">班级人数</label>
-            <input type="text" class="form-input" id="csCount" readonly style="background:var(--bg-main)">
+            <input type="number" class="form-input" id="csCount" min="0">
           </div>
         </div>
         <div class="modal-footer" style="display:flex;gap:8px;padding:12px 16px">
@@ -2241,6 +2242,7 @@ for (let i = 0; i < 58; i++) {
       d9: Math.random()>0.5 ? Math.floor(Math.random()*5) : 0,
       d10: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
       d11: Math.random()>0.6 ? Math.floor(Math.random()*3) : 0,
+      d12: 0,
       note: Math.random()>0.8 ? '表现良好' : '',
     }
   });
@@ -2250,11 +2252,13 @@ students.forEach(s => {
   const deducts = s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11;
   s.conduct.total = 100 + adds - deducts;
 });
+// 若已上传过班级名单，则用名单覆盖内置演示学生（考勤点名/学生档案随名单变化，并跨刷新保留）
+loadRosterStudents();
 
 // 品德操行净汇总（与 PC 端一致）：各维度加分之和 - 各维度减分之和，不再以 100 为基准
 function mConductNet(s) {
   return (s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10) -
-         (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11);
+         (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11 + s.conduct.d12);
 }
 
 // ================== Supabase 云端同步层（真正跨设备数据回传）==================
@@ -2320,6 +2324,7 @@ function applyCloudRecords() {
       if (!s) return;
       s.violations.unshift({ type: r.vtype, desc: r.description, score: -r.score, isBonus: false, date: r.vdate, photo: r.photo });
       s.conduct.total -= r.score;
+      s.conduct.d12 += r.score; // 云端违纪收集表扣分关联到“违纪”列
       if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 += r.score;
       else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
       else s.conduct.d9 += r.score;
@@ -2327,6 +2332,7 @@ function applyCloudRecords() {
     try { if (typeof initMStudentTable==='function') initMStudentTable(); } catch(e){}
     renderReportCard();
   });
+  if (typeof applyMClassInfoTitle==='function') applyMClassInfoTitle(); // 页面加载即应用本地已保存的班级信息/班主任姓名
   if (typeof applyCloudClassInfo==='function') applyCloudClassInfo();
   if (typeof applyCloudDuty==='function') applyCloudDuty();
 }
@@ -3088,18 +3094,15 @@ function initConductCards() {
           <div class="cci-name">${s.name}</div>
           <div class="cci-id">${s.id} · ${s.dorm}</div>
         </div>
-        <div class="cci-score ${sc}">${score}</div>
+        <div class="cci-score ${sc}" id="cdScoreTop_${s.fullId}">${score}</div>
       </div>
       <div class="cci-dims">
-        <div class="cci-dim"><span class="cd-label">黑板报</span><span class="cd-val" style="color:${s.conduct.d1>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d1>0?'+'+s.conduct.d1:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">好人好事</span><span class="cd-val" style="color:${s.conduct.d2>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d2>0?'+'+s.conduct.d2:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">班干部</span><span class="cd-val" style="color:${s.conduct.d4>0?'var(--success-dark)':'var(--text-3)'}">${s.conduct.d4>0?'+'+s.conduct.d4:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">班级卫生</span><span class="cd-val" style="color:${s.conduct.d6>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d6>0?'-'+s.conduct.d6:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">宿舍/手机</span><span class="cd-val" style="color:${s.conduct.d7>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d7>0?'-'+s.conduct.d7:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">晚修纪律</span><span class="cd-val" style="color:${s.conduct.d8>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d8>0?'-'+s.conduct.d8:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">课堂/作业</span><span class="cd-val" style="color:${s.conduct.d9>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d9>0?'-'+s.conduct.d9:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">出勤/仪容</span><span class="cd-val" style="color:${s.conduct.d11>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d11>0?'-'+s.conduct.d11:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">总分</span><span class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
+        ${[['d1','黑板报','add'],['d2','好人好事','add'],['d4','班干部','add'],['d6','班级卫生','sub'],['d7','宿舍/手机','sub'],['d8','晚修纪律','sub'],['d9','课堂/作业','sub'],['d11','出勤/仪容','sub']].map(function(d){
+          var key=d[0], lab=d[1], pos=(d[2]==='add');
+          var v=s.conduct[key]||0;
+          return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><input id="cdIn_'+s.fullId+'_'+key+'" type="number" class="cd-input" value="'+v+'" min="0" style="'+(pos?'color:var(--success-dark);':'color:var(--danger);')+'" oninput="mAdjustConduct(\''+s.fullId+'\',\''+key+'\',this)"></div>';
+        }).join('')}
+        <div class="cci-dim"><span class="cd-label">总分</span><span id="cdScoreDim_${s.fullId}" class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
       </div>
     `;
     list.appendChild(card);
@@ -3112,6 +3115,23 @@ function initConductCards() {
   more.style.fontSize = '12px';
   more.textContent = '上拉加载更多（共58人）';
   list.appendChild(more);
+}
+
+// 品德操行表格模式：手动输入某学生某维度得分后，实时重算总分并保存
+function mAdjustConduct(fid, key, el) {
+  var s = students.find(function(x){ return x.fullId === fid; });
+  if (!s) return;
+  var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
+  if (isNaN(v)) v = 0;
+  s.conduct[key] = Math.abs(v); // 加分/减分均按数值存，正负由维度类型决定
+  var score = mConductNet(s);
+  var sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
+  var top = document.getElementById('cdScoreTop_' + fid);
+  var dime = document.getElementById('cdScoreDim_' + fid);
+  if (top) { top.textContent = score; top.className = 'cci-score ' + sc; }
+  if (dime) { dime.textContent = score; dime.style.color = score > 0 ? 'var(--success-dark)' : score < 0 ? 'var(--danger)' : 'var(--text-2)'; }
+  // 已上传名单时回写，跨刷新保留
+  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){}
 }
 
 function switchConductMode(mode) {
@@ -3240,6 +3260,7 @@ function selectMStudent(s, tr) {
         <div style="font-size:12px;font-weight:600;margin-bottom:6px">违纪情况记录</div>
         <div id="mProfileViolations">${renderMViolationList(s)}</div>
       </div>
+      ${mConductNotesHtml(s)}
       <div style="margin-top:12px">
         <div style="font-size:12px;font-weight:600;margin-bottom:6px">📊 成绩 / 考证记录</div>
         <div id="mProfileScores"></div>
@@ -3263,6 +3284,22 @@ function renderMViolationList(s) {
       <span class="vi-score ${v.isBonus?'bonus':''}">${v.isBonus?'+':'-'}${v.score}</span>
     </div>
   `).join('') + '</div>';
+}
+
+// 品德操行收集表上传的图片/备注：学生档案中以缩略图展示，点击放大查看
+function mConductNotesHtml(s) {
+  var ns = (s.conduct && s.conduct.notes) || [];
+  if (!ns.length) return '';
+  var html = '<div style="margin-top:12px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📎 操行备注 / 收集表图片</div>';
+  ns.slice().reverse().forEach(function(n) {
+    var img = n.photo
+      ? '<div style="margin-top:4px"><img src="'+n.photo+'" style="width:56px;height:56px;border-radius:6px;object-fit:cover" onclick="showPhotoPreview(this.src)" /></div>'
+      : '';
+    html += '<div style="background:var(--bg-main);border-radius:6px;padding:6px 8px;margin-bottom:6px">' +
+      '<div style="font-size:11px;color:var(--text-3)">' + n.date + '</div>' +
+      '<div style="font-size:12px;color:var(--text-2)">' + n.text + '</div>' + img + '</div>';
+  });
+  return html + '</div>';
 }
 
 let bsTrendChart = null;
@@ -3709,6 +3746,9 @@ function applyMClassInfoInputs() {
 function applyMClassInfoTitle() {
   var o = loadMClassInfo();
   var gsub = document.querySelector('.g-sub'), role = document.querySelector('.profile-role');
+  var ghello = document.querySelector('.g-hello');
+  // 问候语更新为所填班主任姓名；未填则保留默认"李老师"
+  if (ghello) ghello.textContent = (o.teacher && String(o.teacher).trim()) ? (o.teacher + '老师好 👋') : '李老师好 👋';
   if (o.className) {
     if (gsub) gsub.innerHTML = o.className + ' · ' + (o.count || '58') + '人';
     if (role) role.textContent = '班主任 · ' + o.className;
@@ -3775,29 +3815,210 @@ function showRosterUploadSheet() {
   showModal('rosterUploadSheet');
 }
 
+// ===== 班级名单上传：解析 Excel/CSV 并替换 students，同步到考勤/学生档案，跨刷新保留 =====
+var ROSTER_KEY = 'smartclass_roster_students';
+function saveRosterStudents(arr) { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(arr)); } catch(e){} }
+function loadRosterStudents() {
+  try {
+    var raw = localStorage.getItem(ROSTER_KEY);
+    if (!raw) return;
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr) || !arr.length) return;
+    students.length = 0;
+    arr.forEach(function(s){ students.push(s); });
+  } catch(e) {}
+}
+function mTrimCell(v) { return String(v == null ? '' : v).replace(/\ufeff/g, '').trim(); }
+function mBuildRosterStudents(rows) {
+  if (!rows || !rows.length) return [];
+  var hr = -1, ci = { id:-1, name:-1, gender:-1, dorm:-1, phone:-1, address:-1 };
+  for (var r = 0; r < rows.length && hr < 0; r++) {
+    var row = rows[r] || [];
+    for (var c = 0; c < row.length; c++) {
+      var t = mTrimCell(row[c]);
+      if (!t) continue;
+      if (t.indexOf('学号') >= 0) { if (ci.id < 0) ci.id = c; }
+      else if (t.indexOf('姓名') >= 0) { if (ci.name < 0) ci.name = c; }
+      else if (t === '性别') { if (ci.gender < 0) ci.gender = c; }
+      else if (t.indexOf('宿舍') >= 0) { if (ci.dorm < 0) ci.dorm = c; }
+      else if (t.indexOf('联系') >= 0 || t.indexOf('电话') >= 0) { if (ci.phone < 0) ci.phone = c; }
+      else if (t.indexOf('住址') >= 0) { if (ci.address < 0) ci.address = c; }
+    }
+    if ((ci.id >= 0 || ci.name >= 0) && ci.name >= 0) hr = r;
+  }
+  if (hr < 0 || ci.name < 0) return [];
+  var out = [];
+  for (var i = hr + 1; i < rows.length; i++) {
+    var RR = rows[i] || [];
+    var name = mTrimCell(RR[ci.name]);
+    if (!name) continue;
+    var idRaw = mTrimCell(RR[ci.id >= 0 ? ci.id : 0]);
+    var id = idRaw || ('0' + (out.length + 1)).slice(-2);
+    var fullId = idRaw || ('2024' + String(id).padStart(3, '0'));
+    var gender = mTrimCell(RR[ci.gender >= 0 ? ci.gender : 1]) || '男';
+    var dorm = mTrimCell(RR[ci.dorm >= 0 ? ci.dorm : 2]);
+    var phone = mTrimCell(RR[ci.phone >= 0 ? ci.phone : -1]);
+    var address = mTrimCell(RR[ci.address >= 0 ? ci.address : -1]);
+    out.push({
+      id: id, fullId: fullId, name: name, dorm: dorm, gender: gender, phone: phone, address: address,
+      hasPhoto: false, color: avatarColors[out.length % avatarColors.length], violations: [],
+      conduct: { d1:0,d2:0,d3:0,d4:0,d5:0,d6:0,d7:0,d8:0,d9:0,d10:0,d11:0,d12:0, note:'', total:0 }
+    });
+  }
+  return out;
+}
+function mParseRosterCsv(text) {
+  var rows = String(text).split(/\r?\n/).filter(function(l){ return l.trim() !== ''; })
+    .map(function(l){ return l.split(/[,，\t]/); });
+  return mBuildRosterStudents(rows);
+}
 function handleMRosterUpload(input) {
   const file = input.files[0];
   if (!file) return;
   const fileName = file.name;
+  const lower = fileName.toLowerCase();
   const area = document.getElementById('mRosterUploadArea');
   const placeholder = document.getElementById('mRosterPlaceholder');
   const result = document.getElementById('mRosterResult');
-  placeholder.style.display = 'none';
-  result.style.display = '';
-  result.innerHTML = `
-    <div style="text-align:left">
-      <div style="font-size:28px">✅</div>
-      <div style="font-size:14px;font-weight:600;color:var(--success-dark);margin-top:4px">名单上传成功！</div>
-      <div style="font-size:12px;color:var(--text-3);margin-top:4px">文件：${fileName}</div>
-      <div style="font-size:12px;color:var(--text-3);margin-top:2px">解析到 <b style="color:var(--success-dark)">${students.length}</b> 名学生</div>
-      <div style="font-size:12px;color:var(--text-3);margin-top:2px">已同步至：学生档案 · 考勤点名 · 品德操行</div>
-    </div>
-  `;
-  area.classList.add('has-photo');
-  document.getElementById('mRosterStatusTag').textContent = '已加载 ' + students.length + '人';
-  showToast('名单已上传，已同步至学生档案和考勤点名');
-  initMStudentTable();
-  initMAttendance();
+  const ok = function(n) {
+    placeholder.style.display = 'none';
+    result.style.display = '';
+    result.innerHTML = `
+      <div style="text-align:left">
+        <div style="font-size:28px">✅</div>
+        <div style="font-size:14px;font-weight:600;color:var(--success-dark);margin-top:4px">名单上传成功！</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px">文件：${fileName}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px">解析到 <b style="color:var(--success-dark)">${n}</b> 名学生</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px">已同步至：学生档案 · 考勤点名（刷新后保留）</div>
+      </div>`;
+    area.classList.add('has-photo');
+    document.getElementById('mRosterStatusTag').textContent = '已加载 ' + n + '人';
+  };
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var parsed;
+      if (lower.indexOf('.csv') >= 0) {
+        parsed = mParseRosterCsv(String(e.target.result || ''));
+      } else if (typeof XLSX !== 'undefined') {
+        var wb = XLSX.read(e.target.result, { type: 'array' });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        parsed = mBuildRosterStudents(rows);
+      } else {
+        showToast('表格解析库未加载，请检查网络'); return;
+      }
+      if (!parsed || !parsed.length) { showToast('未解析到学生数据，请检查是否含“姓名”列'); return; }
+      students.length = 0;
+      parsed.forEach(function(s){ students.push(s); });
+      saveRosterStudents(students);
+      // 同步班级人数（未填时自动填，已填则不覆盖）
+      var ci = loadMClassInfo();
+      var cntEl = document.getElementById('csCount');
+      if (cntEl && !String(cntEl.value).trim()) cntEl.value = students.length;
+      if (!ci.count) { ci.count = students.length; saveMClassInfo(ci); }
+      applyMClassInfoTitle();
+      initMStudentTable();
+      initMAttendance();
+      ok(students.length);
+      showToast('名单已上传，已同步至学生档案和考勤点名');
+    } catch(err) { console.error(err); showToast('解析失败：' + err.message); }
+  };
+  if (lower.indexOf('.csv') >= 0) reader.readAsText(file); else reader.readAsArrayBuffer(file);
+}
+
+// ===== 品德操行：下载/上传模板（SheetJS，与操行卡片维度一致） =====
+var M_CDIM = [
+  ['d1','黑板报'],['d2','好人好事'],['d3','加分·其他'],['d4','班干部'],['d5','学习表现'],
+  ['d6','班级卫生'],['d7','宿舍/手机'],['d8','晚修纪律'],['d9','课堂/作业'],['d10','获奖奖励'],['d11','出勤/仪容'],['d12','违纪']
+];
+function mConductKeyFor(label) {
+  var l = String(label).trim();
+  var m = l.match(/\(d(\d+)\)/);
+  if (m) return 'd' + m[1];
+  for (var i = 0; i < M_CDIM.length; i++) {
+    if (l.indexOf(M_CDIM[i][1]) >= 0) return M_CDIM[i][0];
+  }
+  return null;
+}
+function mDownloadConductTemplate() {
+  if (typeof XLSX === 'undefined') { showToast('表格库未加载，请检查网络'); return; }
+  var headers = ['学号', '姓名'];
+  M_CDIM.forEach(function(x){ headers.push(x[1] + '(' + x[0] + ')'); });
+  var aoa = [];
+  if (students[0]) {
+    var row = [students[0].fullId || students[0].id, students[0].name];
+    M_CDIM.forEach(function(x){ row.push(students[0].conduct[x[0]] || 0); });
+    aoa = [row];
+  }
+  mExportSheet('品德操行模板', headers, aoa);
+  showToast('模板已下载');
+}
+function mUploadConductTemplate() {
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.xlsx,.xls,.csv';
+  inp.onchange = function(ev) {
+    var f = ev.target.files[0];
+    if (!f) return;
+    var lower = f.name.toLowerCase();
+    var rd = new FileReader();
+    rd.onload = function(e2) {
+      try {
+        var rows;
+        if (lower.indexOf('.csv') >= 0) {
+          rows = String(e2.target.result).split(/\r?\n/).filter(Boolean).map(function(l){ return l.split(/[,，\t]/); });
+        } else if (typeof XLSX === 'undefined') {
+          showToast('表格库未加载，请检查网络'); return;
+        } else {
+          var wb = XLSX.read(e2.target.result, { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        }
+        var n = mApplyConductTemplate(rows);
+        if (!n) showToast('未导入数据：请用「下载模板」填好后再上传');
+        else showToast('已导入 ' + n + ' 名学生操行数据');
+      } catch(err) { console.error(err); showToast('导入失败：' + err.message); }
+    };
+    if (lower.indexOf('.csv') >= 0) rd.readAsText(f); else rd.readAsArrayBuffer(f);
+  };
+  inp.click();
+}
+function mApplyConductTemplate(rows) {
+  if (!rows || !rows.length) return 0;
+  var hr = -1, nameC = -1, colMap = {};
+  for (var r = 0; r < Math.min(rows.length, 8); r++) {
+    var row = rows[r] || [];
+    for (var c = 0; c < row.length; c++) {
+      var t = String(row[c]).trim();
+      if (!t) continue;
+      if (t.indexOf('姓名') >= 0) { if (nameC < 0) { nameC = c; hr = r; } }
+      else { var k = mConductKeyFor(t); if (k && colMap[c] === undefined) colMap[c] = k; }
+    }
+    if (hr >= 0) break;
+  }
+  if (hr < 0 || nameC < 0) return 0;
+  var applied = 0;
+  for (var i = hr + 1; i < rows.length; i++) {
+    var R = rows[i] || [];
+    var nm = String(R[nameC]).trim();
+    if (!nm) continue;
+    var s = students.find(function(x){ return x.name === nm; });
+    if (!s) continue;
+    Object.keys(colMap).forEach(function(c){
+      var v = parseFloat(String(R[c]).replace(/[^\d.\-]/g, ''));
+      if (isNaN(v)) v = 0;
+      s.conduct[colMap[c]] = v;
+    });
+    s.conduct.total = mConductNet(s);
+    applied++;
+  }
+  // 仅当上传过名单(有持久化)时才回写，避免污染内置演示数据
+  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){}
+  if (typeof initConductCards === 'function') initConductCards();
+  if (typeof renderMConductWeekView === 'function') renderMConductWeekView();
+  if (typeof initMStudentTable === 'function') initMStudentTable();
+  return applied;
 }
 function showShareModal() {
   showModal('shareModal');
@@ -4202,6 +4423,7 @@ function submitStandaloneForm(isViolation) {
     var dateStr = dateVal ? dateVal.replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
     s.violations.push({ date: dateStr, type: typeName, desc: desc, score: -sfvScore, photo: sfvPhotoData });
     s.conduct.total -= sfvScore;
+    s.conduct.d12 += sfvScore; // 违纪收集表上传的扣分关联到“违纪”列
     if (typeName.indexOf('晚修') !== -1 || typeName.indexOf('手机') !== -1) s.conduct.d7 += sfvScore;
     else if (typeName.indexOf('旷课') !== -1) s.conduct.d11 += sfvScore;
     else s.conduct.d9 += sfvScore;
@@ -4210,7 +4432,17 @@ function submitStandaloneForm(isViolation) {
     s.conduct[dim] += sfvScore;
     if (sfvSelectedType.scoreType === '加分') s.conduct.total += sfvScore;
     else s.conduct.total -= sfvScore;
+    // 品德操行收集表：保存上传图片/备注，供学生档案“备注”区缩略图放大查看
+    if (sfvPhotoData || desc !== '未填写描述') {
+      s.conduct.notes = s.conduct.notes || [];
+      s.conduct.notes.push({ date: new Date().toLocaleDateString('zh-CN'), text: desc, photo: sfvPhotoData || '' });
+    }
   }
+
+  // 若已上传名单，回写保存，使“违纪”列关联的扣分可跨刷新保留；并刷新相关界面
+  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){}
+  if (typeof initConductCards === 'function') initConductCards();
+  if (typeof initMStudentTable === 'function') initMStudentTable();
 
   var container = document.getElementById('standaloneFormView');
   container.innerHTML =
