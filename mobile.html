@@ -2173,6 +2173,12 @@ students.forEach(s => {
   s.conduct.total = 100 + adds - deducts;
 });
 
+// 品德操行净汇总（与 PC 端一致）：各维度加分之和 - 各维度减分之和，不再以 100 为基准
+function mConductNet(s) {
+  return (s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10) -
+         (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11);
+}
+
 // ================== Supabase 云端同步层（真正跨设备数据回传）==================
 // 配置存于 localStorage，由 PC 端“数据同步配置”入口写入，手机端读取同一配置。
 var SB_URL_KEY = 'smartclass_supabase_url';
@@ -2760,8 +2766,8 @@ function initConductCards() {
   const list = document.getElementById('conductCardList');
   list.innerHTML = '';
   students.slice(0, 15).forEach(s => {
-    const score = s.conduct.total;
-    const sc = score >= 95 ? 'good' : score >= 85 ? 'warn' : 'bad';
+    const score = mConductNet(s);
+    const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
     card.className = 'conduct-card-item';
     card.innerHTML = `
@@ -2782,7 +2788,7 @@ function initConductCards() {
         <div class="cci-dim"><span class="cd-label">晚修纪律</span><span class="cd-val" style="color:${s.conduct.d8>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d8>0?'-'+s.conduct.d8:'0'}</span></div>
         <div class="cci-dim"><span class="cd-label">课堂/作业</span><span class="cd-val" style="color:${s.conduct.d9>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d9>0?'-'+s.conduct.d9:'0'}</span></div>
         <div class="cci-dim"><span class="cd-label">出勤/仪容</span><span class="cd-val" style="color:${s.conduct.d11>0?'var(--danger)':'var(--text-3)'}">${s.conduct.d11>0?'-'+s.conduct.d11:'0'}</span></div>
-        <div class="cci-dim"><span class="cd-label">总分</span><span class="cd-val" style="font-weight:700;color:${score>=95?'var(--success-dark)':score>=85?'var(--orange)':'var(--danger)'}">${score}</span></div>
+        <div class="cci-dim"><span class="cd-label">总分</span><span class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
       </div>
     `;
     list.appendChild(card);
@@ -2913,7 +2919,7 @@ function selectMStudent(s, tr) {
       <div class="st-profile-row"><span class="pr-label">宿舍号</span><span class="pr-value">${s.dorm}</span></div>
       <div class="st-profile-row"><span class="pr-label">家长电话</span><span class="pr-value">${s.phone}</span></div>
       <div class="st-profile-row"><span class="pr-label">家庭住址</span><span class="pr-value">${s.address}</span></div>
-      <div class="st-profile-row"><span class="pr-label">本周操行分</span><span class="pr-value" style="color:var(--success-dark)">${s.conduct.total}分</span></div>
+      <div class="st-profile-row"><span class="pr-label">本周操行分</span><span class="pr-value" style="color:${mConductNet(s)>0?'var(--success-dark)':mConductNet(s)<0?'var(--danger)':'var(--text-2)'}">${mConductNet(s)}分</span></div>
       <div class="st-profile-row"><span class="pr-label">违纪记录</span><span class="pr-value">${viCount>0?'<span class="tag tag-red">'+viCount+'条</span>':'<span class="tag tag-gray">0条</span>'}</span></div>
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" style="flex:1" onclick="showPhotoUploadModal()">${s.hasPhoto?'更换照片':'上传照片'}</button>
