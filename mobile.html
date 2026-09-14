@@ -110,16 +110,23 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px);
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
   }
-  /* 内容底部预留菜单栏高度，避免被固定吸底的菜单栏遮挡 */
+  /* 内容底部预留菜单栏高度，避免底部卡片/按钮被固定吸底的菜单栏遮挡 */
   .page {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
   }
-  /* 真机底部弹层：上移避开手势条，不被底栏遮挡（导出缺席、操行均分对比等底部抽屉） */
+  /* 真机底部弹层：遮罩相对可见视口定位(fixed)，盖住应用底栏；
+     抽屉容器本身底部预留浏览器自带工具栏高度(72px+安全区)，无论抽屉是列表(无footer)还是
+     表单(有footer)，其最底部内容/按钮都整体抬升到工具栏上方不被遮挡；body 可滚动长表单不挤出按钮 */
   .modal-mask {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    position: fixed;
   }
   .modal-mask .modal-sheet {
-    max-height: calc(80% - env(safe-area-inset-bottom, 0px) - 8px);
+    max-height: calc(92% - env(safe-area-inset-bottom, 0px) - 8px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 112px);
+  }
+  .modal-mask .modal-body {
+    flex: 1;
+    min-height: 0;
   }
 }
 .status-bar {
