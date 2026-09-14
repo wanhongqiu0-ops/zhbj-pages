@@ -80,6 +80,26 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
   border-radius: 0 0 16px 16px;
   z-index: 200;
 }
+/* ===== 真机浏览器：去掉黑框/手机壳，铺满设备视口（适配 realme 13 Pro+ 等~393px 宽） ===== */
+@media (max-width: 768px) {
+  body { overflow: hidden; }
+  .phone-frame {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .phone-frame::before { display: none; }
+  .status-bar { display: none; }
+  .app-container {
+    height: 100vh;
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
 .status-bar {
   height: 24px;
   display: flex;
@@ -2008,12 +2028,8 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <!-- Step 1: Share -->
         <div id="ccShareSection" style="padding:0 16px">
           <p style="font-size:12px;color:var(--text-3);margin:12px 0">班干部打开链接即可填写操行数据，提交后自动汇总到对应周表格</p>
-          <div style="margin-bottom:12px">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">本次收集周次</label>
-            <select class="form-input" id="ccCollectWeek" onchange="onCcWeekChange()" style="width:100%"></select>
-          </div>
           <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">
-            <div style="width:100px;height:100px;flex-shrink:0" id="ccQrcode"></div>
+            <div style="width:160px;height:160px;flex-shrink:0" id="ccQrcode"></div>
             <div style="flex:1">
               <div style="font-size:12px;font-weight:600;margin-bottom:6px">分享链接</div>
               <div style="background:var(--bg-main);border-radius:6px;padding:6px 10px;font-size:11px;display:flex;align-items:center;justify-content:space-between">
@@ -3249,8 +3265,7 @@ function showCcShareSheet() {
   document.getElementById('ccScoreType').textContent = '分';
   document.getElementById('ccScoreType').style.color = '';
   showModal('conductCollectModal');
-  initCcWeekSelect();
-  const url = buildCcShareUrl();
+  const url = getCollectShareUrl('conduct_form.html') || getShareUrl('conduct');
   document.getElementById('ccLinkText').textContent = url;
   setTimeout(() => genQrcode('ccQrcode', url), 100);
 }
@@ -3341,42 +3356,6 @@ function genQrcode(elId, text) {
 function getShareUrl(hash) {
   var href = location.href.split('#')[0];
   return decodeURI(href) + '#' + hash;
-}
-
-// ---- 品缴收集表分发周次 ----
-function currentMCollectWeek() {
-  var d = new Date();
-  var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  var dayNum = t.getUTCDay() || 7;
-  t.setUTCDate(t.getUTCDate() + 4 - dayNum);
-  var y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  var w = Math.ceil((((t - y0) / 86400000) + 1) / 7);
-  return w < 1 ? 1 : (w > 20 ? 20 : w);
-}
-function initCcWeekSelect() {
-  var sel = document.getElementById('ccCollectWeek');
-  if (!sel) return;
-  if (sel.options.length === 0) {
-    var cur = currentMCollectWeek();
-    sel.innerHTML = Array.apply(null, { length: 20 }).map(function(_, i) {
-      var w = i + 1;
-      return '<option value="' + w + '">第' + w + '周' + (w === cur ? '（本周）' : '') + '</option>';
-    }).join('');
-    sel.value = String(cur);
-  }
-}
-function buildCcShareUrl() {
-  var base = getCollectBaseUrl();
-  if (!base) return null;
-  var w = encodeURIComponent(String(document.getElementById('ccCollectWeek').value || currentMCollectWeek()));
-  var p = sbParam(); // 带 Supabase 凭证，方便跨设备扫码直接提交
-  var q = p ? (p + '&week=' + w) : ('?week=' + w);
-  return base + 'conduct_form.html' + q;
-}
-function onCcWeekChange() {
-  var url = buildCcShareUrl();
-  document.getElementById('ccLinkText').textContent = url;
-  setTimeout(function(){ genQrcode('ccQrcode', url); }, 100);
 }
 
 function fallbackCopy(text) {
