@@ -99,6 +99,18 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
     height: 100dvh;
     padding-top: env(safe-area-inset-top, 0px);
   }
+  /* 真机底部：抬高底部菜单栏，避开系统手势条 / 导航区，保证 5 个模块按钮完整显示 */
+  .tabbar {
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  }
+  /* 真机底部弹层：上移避开手势条，不被底栏遮挡（导出缺席、操行均分对比等底部抽屉） */
+  .modal-mask {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  }
+  .modal-mask .modal-sheet {
+    max-height: calc(80% - env(safe-area-inset-bottom, 0px) - 8px);
+  }
 }
 .status-bar {
   height: 24px;
@@ -117,7 +129,7 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 
 /* ========== App Layout ========== */
 .app-container {
-  height: calc(812px - 24px);
+  height: 812px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -147,6 +159,7 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 /* Content Area */
 .content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -270,6 +283,10 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .stat-card .sc-value { font-size: 22px; font-weight: 700; }
 .stat-card .sc-unit { font-size: 12px; font-weight: 400; color: var(--text-3); margin-left: 2px; }
 .stat-card .sc-trend { font-size: 10px; margin-top: 4px; }
+.stat-card .sc-add {
+  display: inline-block; margin-left: 4px; padding: 0 6px; font-size: 10px; color: var(--primary);
+  background: var(--primary-light); border-radius: 8px; vertical-align: 1px; line-height: 1.7;
+}
 .duty-day { border:1px solid var(--border); border-radius:var(--radius-xs); padding:9px 11px; margin-bottom:8px; }
 .duty-day.is-today { border-color: var(--primary); background: var(--primary-light); }
 .duty-day-head { font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
@@ -285,6 +302,32 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
   padding: 12px 0;
   border-bottom: 1px solid var(--border-light);
 }
+/* 右滑删除：外层容器 + 右侧删除按钮 + 可滑动的内层 */
+.todo-swipe {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-light);
+}
+.todo-swipe .todo-item { border-bottom: none; }
+.todo-del {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 76px;
+  background: #e5484d;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  z-index: 1;
+}
+.todo-inner {
+  position: relative;
+  z-index: 2;
+  background: #fff;
+  transition: transform 0.22s ease;
+  touch-action: pan-y;
+}
+.todo-inner.open { transform: translateX(-76px); }
 .todo-item:last-child { border-bottom: none; }
 .todo-check {
   width: 20px; height: 20px;
@@ -789,15 +832,6 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
 <!-- Phone Frame -->
 <div class="phone-frame">
   <!-- Status Bar -->
-  <div class="status-bar">
-    <span>9:08</span>
-    <span></span>
-    <div class="sb-right">
-      <span style="font-size:11px">📶</span>
-      <span style="font-size:11px">🔋</span>
-    </div>
-  </div>
-
   <div class="app-container">
     <!-- ========== Topbar ========== -->
     <header class="topbar" id="topbar">
@@ -870,17 +904,17 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
             <div class="sc-value" id="cwHomeAvg">—<span class="sc-unit">分</span></div>
             <div class="sc-trend" style="color:var(--text-3)" id="cwHomeWeek">第8周 · 点击查看对比</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="openLeaveInput()" style="cursor:pointer">
             <div class="sc-icon">📝</div>
-            <div class="sc-label">待审批请假</div>
-            <div class="sc-value">3<span class="sc-unit">条</span></div>
-            <div class="sc-trend" style="color:var(--orange)">需处理</div>
+            <div class="sc-label">待审批请假 <span class="sc-add">＋录入</span></div>
+            <div class="sc-value" id="leaveCount">0<span class="sc-unit">条</span></div>
+            <div class="sc-trend" style="color:var(--orange)">点击录入 / 逐条左滑删除</div>
           </div>
-          <div class="stat-card">
-            <div class="sc-icon">⚠️</div>
-            <div class="sc-label">未填报收集表</div>
-            <div class="sc-value">2<span class="sc-unit">项</span></div>
-            <div class="sc-trend" style="color:var(--danger)">待跟进</div>
+          <div class="stat-card" id="collectStatCard" onclick="openCollectStat()" style="cursor:pointer">
+            <div class="sc-icon">📥</div>
+            <div class="sc-label">已填报收集表</div>
+            <div class="sc-value" id="collectCount">0<span class="sc-unit">条</span></div>
+            <div class="sc-trend" style="color:var(--success-dark)" id="collectTrend">点击查看 / 清空</div>
           </div>
         </div>
 
@@ -952,61 +986,9 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         </div>
 
         <!-- Leave Approval -->
-        <div class="section-title">请假审批 <span style="font-weight:400;color:var(--text-3);font-size:12px">3条待审</span></div>
+        <div class="section-title">请假审批 <span style="font-weight:400;color:var(--text-3);font-size:12px" id="leavePendingCount">0条待审</span></div>
         <div class="card">
-          <div class="card-body">
-            <div class="leave-item">
-              <div class="leave-row">
-                <div>
-                  <span class="leave-student">张三</span>
-                  <span style="font-size:11px;color:var(--text-3)"> 20240301</span>
-                </div>
-                <span class="tag tag-red">病假</span>
-              </div>
-              <div class="leave-detail">
-                9月8日 14:00 — 9月9日 18:00<br>
-                发烧38.5°C，家长电话请假
-              </div>
-              <div class="leave-actions">
-                <button class="btn btn-success btn-sm" onclick="showToast('已通过 张三 请假')">✓ 通过</button>
-                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
-              </div>
-            </div>
-            <div class="leave-item">
-              <div class="leave-row">
-                <div>
-                  <span class="leave-student">李四</span>
-                  <span style="font-size:11px;color:var(--text-3)"> 20240305</span>
-                </div>
-                <span class="tag tag-blue">事假</span>
-              </div>
-              <div class="leave-detail">
-                9月9日 08:00 — 17:00<br>
-                家中有事，需回家处理
-              </div>
-              <div class="leave-actions">
-                <button class="btn btn-success btn-sm" onclick="showToast('已通过 李四 请假')">✓ 通过</button>
-                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
-              </div>
-            </div>
-            <div class="leave-item">
-              <div class="leave-row">
-                <div>
-                  <span class="leave-student">王五</span>
-                  <span style="font-size:11px;color:var(--text-3)"> 20240312</span>
-                </div>
-                <span class="tag tag-green">公假</span>
-              </div>
-              <div class="leave-detail">
-                9月9日 10:00 — 16:00<br>
-                代表学校参加技能竞赛
-              </div>
-              <div class="leave-actions">
-                <button class="btn btn-success btn-sm" onclick="showToast('已通过 王五 请假')">✓ 通过</button>
-                <button class="btn btn-default btn-sm" onclick="showToast('已驳回')">驳回</button>
-              </div>
-            </div>
-          </div>
+          <div class="card-body" id="leaveList"></div>
         </div>
       </div>
 
@@ -1526,22 +1508,22 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
 
         <div class="section-title">数据导出</div>
         <div class="profile-menu">
-          <div class="pm-item" onclick="showToast('导出考勤记录')">
+          <div class="pm-item" onclick="mExportAttendancePick()">
             <span class="pm-icon">✅</span>
             <span class="pm-label">考勤记录导出</span>
             <span class="pm-arrow">›</span>
           </div>
-          <div class="pm-item" onclick="showToast('导出操行分报表')">
+          <div class="pm-item" onclick="mExportConductPick()">
             <span class="pm-icon">📊</span>
             <span class="pm-label">操行分报表导出</span>
             <span class="pm-arrow">›</span>
           </div>
-          <div class="pm-item" onclick="showToast('导出请假记录')">
+          <div class="pm-item" onclick="mExportLeaveXlsx()">
             <span class="pm-icon">📝</span>
             <span class="pm-label">请假记录导出</span>
             <span class="pm-arrow">›</span>
           </div>
-          <div class="pm-item" onclick="showToast('导出学生档案（含照片）')">
+          <div class="pm-item" onclick="mExportArchivePick()">
             <span class="pm-icon">👤</span>
             <span class="pm-label">学生档案导出（含照片）</span>
             <span class="pm-arrow">›</span>
@@ -1685,28 +1667,28 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">班级名称</label>
-            <input type="text" class="form-input" value="21级计算机1班">
+            <input type="text" class="form-input" id="csClassName">
           </div>
           <div class="form-group">
             <label class="form-label">年级</label>
-            <select class="form-select"><option>2021级</option><option>2022级</option><option>2023级</option><option>2024级</option></select>
+            <select class="form-select" id="csGrade"><option>2021级</option><option>2022级</option><option>2023级</option><option>2024级</option></select>
           </div>
           <div class="form-group">
             <label class="form-label">专业</label>
-            <input type="text" class="form-input" value="计算机应用技术">
+            <input type="text" class="form-input" id="csMajor">
           </div>
           <div class="form-group">
             <label class="form-label">班主任</label>
-            <input type="text" class="form-input" value="李老师">
+            <input type="text" class="form-input" id="csTeacher">
           </div>
           <div class="form-group">
             <label class="form-label">班级人数</label>
-            <input type="text" class="form-input" value="58" readonly style="background:var(--bg-main)">
+            <input type="text" class="form-input" id="csCount" readonly style="background:var(--bg-main)">
           </div>
         </div>
         <div class="modal-footer" style="display:flex;gap:8px;padding:12px 16px">
           <button class="btn btn-default btn-block" onclick="hideModal('classSettingsSheet')" style="flex:1">取消</button>
-          <button class="btn btn-primary btn-block" onclick="showToast('班级信息已保存');hideModal('classSettingsSheet')" style="flex:2">保存</button>
+          <button class="btn btn-primary btn-block" onclick="saveMClassInfoCloud()" style="flex:2">保存</button>
         </div>
       </div>
     </div>
@@ -2100,9 +2082,88 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
           <span class="modal-title">⭐ 班级操行分 · 每周对比</span>
           <span class="modal-close" onclick="hideModal('cwWeekViewModal')">✕</span>
         </div>
-        <div class="modal-body" id="cwWeekViewBody" style="max-height:70vh;overflow:auto;padding:12px 16px"></div>
+        <div style="padding:8px 16px 0;display:flex;gap:8px">
+          <label class="btn btn-outline btn-sm" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer">📤 上传量化表
+            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleMConductWeekUpload(this)">
+          </label>
+          <button class="btn btn-outline btn-sm" style="flex:1" onclick="mSyncConductWeek()">🔄 同步云端</button>
+        </div>
+        <div class="modal-body" id="cwWeekViewBody" style="max-height:60vh;overflow:auto;padding:12px 16px"></div>
         <div class="modal-footer">
           <button class="btn btn-default btn-block" onclick="hideModal('cwWeekViewModal')">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 已填报收集表统计抽屉 -->
+    <div class="modal-mask" id="collectStatModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📥 已填报收集表</span>
+          <span class="modal-close" onclick="hideModal('collectStatModal')">✕</span>
+        </div>
+        <div class="modal-body" style="padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-main);border-radius:8px;margin-bottom:8px">
+            <span style="font-size:13px;color:var(--text-2)">品德操行收集</span>
+            <span style="font-size:16px;font-weight:700;color:var(--primary)" id="csConductCount">0</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-main);border-radius:8px;margin-bottom:8px">
+            <span style="font-size:13px;color:var(--text-2)">违纪记录收集</span>
+            <span style="font-size:16px;font-weight:700;color:var(--danger)" id="csViolationCount">0</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-main);border-radius:8px;margin-bottom:16px">
+            <span style="font-size:13px;font-weight:600">合计</span>
+            <span style="font-size:16px;font-weight:700" id="csTotalCount">0</span>
+          </div>
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:16px">次数取自分发链接回传的云端记录条数。</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-default btn-block" onclick="restoreCollectCount()" style="flex:1">↺ 恢复计数</button>
+            <button class="btn btn-danger btn-block" onclick="clearCollectCount()" style="flex:1">🗑 手动清空</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 录入请假 -->
+    <div class="modal-mask" id="leaveInputModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title">📝 录入请假</span>
+          <span class="modal-close" onclick="hideModal('leaveInputModal')">✕</span>
+        </div>
+        <div class="modal-body" style="padding:16px">
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">学生</label>
+          <select id="leaveStudentSelect" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;margin-bottom:12px"><option value="">请选择学生</option></select>
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">请假类型</label>
+          <select id="leaveTypeSelect" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;margin-bottom:12px">
+            <option>病假</option><option>事假</option><option>公假</option>
+          </select>
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">请假时间</label>
+          <input id="leaveTimeInput" placeholder="如 9月10日 08:00 — 18:00" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;margin-bottom:12px">
+          <label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">请假原因</label>
+          <input id="leaveReasonInput" placeholder="如 发烧38.5°C，家长电话请假" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;margin-bottom:16px">
+        </div>
+        <div class="modal-footer" style="display:flex;gap:8px;padding:12px 16px">
+          <button class="btn btn-default btn-block" onclick="hideModal('leaveInputModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="addMLeave()" style="flex:2">✓ 录入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导出目标选择 -->
+    <div class="modal-mask" id="mExportPickModal">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <span class="modal-title" id="mExportPickTitle">选择导出目标</span>
+          <span class="modal-close" onclick="hideModal('mExportPickModal')">✕</span>
+        </div>
+        <div class="modal-body">
+          <select id="mExportPickSelect" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;margin-bottom:8px"></select>
+          <p style="font-size:12px;color:var(--text-3)">选择后点击导出，将生成 .xlsx 文件下载。</p>
+        </div>
+        <div class="modal-footer" style="display:flex;gap:8px;padding:12px 16px">
+          <button class="btn btn-default btn-block" onclick="hideModal('mExportPickModal')" style="flex:1">取消</button>
+          <button class="btn btn-primary btn-block" onclick="confirmExportPick()" style="flex:2">📊 导出</button>
         </div>
       </div>
     </div>
@@ -2201,10 +2262,32 @@ function sbFetch(table, cb) {
     if (Array.isArray(d)) cb(d); else cb([]);
   }).catch(function(){ cb([]); });
 }
+// ===== 已填报收集表（云端记录条数 + 手动清空） =====
+var COLLECT_CLEAR_KEY = 'smartclass_collect_cleared';
+var _clConduct = 0, _clViolation = 0;
+function setCollectCloudCounts(conduct, violation) { _clConduct = conduct || 0; _clViolation = violation || 0; renderReportCard(); }
+function collectCleared() { try { return localStorage.getItem(COLLECT_CLEAR_KEY) === '1'; } catch(e) { return false; } }
+function renderReportCard() {
+  var cleared = collectCleared();
+  var total = cleared ? 0 : (_clConduct + _clViolation);
+  var c = document.getElementById('collectCount'), t = document.getElementById('collectTrend');
+  if (c) c.innerHTML = total + '<span class="sc-unit">条</span>';
+  if (t) t.innerHTML = cleared ? '已手动清空 · 点击查看' : (total > 0 ? '<b style="color:var(--primary)">' + _clConduct + '</b> 操行 · <b style="color:var(--danger)">' + _clViolation + '</b> 违纪' : '点击查看 / 清空');
+}
+function openCollectStat() {
+  var cleared = collectCleared();
+  document.getElementById('csConductCount').textContent = cleared ? 0 : _clConduct;
+  document.getElementById('csViolationCount').textContent = cleared ? 0 : _clViolation;
+  document.getElementById('csTotalCount').textContent = cleared ? 0 : (_clConduct + _clViolation);
+  showModal('collectStatModal');
+}
+function clearCollectCount() { try { localStorage.setItem(COLLECT_CLEAR_KEY, '1'); } catch(e){} renderReportCard(); hideModal('collectStatModal'); showToast('已手动清空次数'); }
+function restoreCollectCount() { try { localStorage.removeItem(COLLECT_CLEAR_KEY); } catch(e){} renderReportCard(); showToast('已恢复计数'); }
 // 从 Supabase 拉取并合并品德操行/违纪记录到本地学生数据
 function applyCloudRecords() {
   if (!sbEnabled()) return;
   sbFetch('conduct_records', function(rows) {
+    _clConduct = (rows||[]).length;
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
@@ -2214,6 +2297,7 @@ function applyCloudRecords() {
     try { if (typeof initConductCards==='function') initConductCards(); } catch(e){}
   });
   sbFetch('violation_records', function(rows) {
+    _clViolation = (rows||[]).length;
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s) return;
@@ -2224,7 +2308,10 @@ function applyCloudRecords() {
       else s.conduct.d9 += r.score;
     });
     try { if (typeof initMStudentTable==='function') initMStudentTable(); } catch(e){}
+    renderReportCard();
   });
+  if (typeof applyCloudClassInfo==='function') applyCloudClassInfo();
+  if (typeof applyCloudDuty==='function') applyCloudDuty();
 }
 
 // ================== 成绩 / 考证 展示（本地 + 云端同步） ==================
@@ -2298,11 +2385,11 @@ var CWEEK_KEY = 'zhbj_conduct_weeks_m';
 function loadCWeks() { try { var d = localStorage.getItem(CWEEK_KEY); return d ? JSON.parse(d) : []; } catch(e) { return []; } }
 function saveCWeks(list) { try { localStorage.setItem(CWEEK_KEY, JSON.stringify(list)); } catch(e) {} }
 // 从 Supabase 拉取班级操行分周数据并合并到本地，刷新首页卡片
-function applyCloudConductWeeks() {
-  if (typeof sbEnabled !== 'function' || !sbEnabled()) return;
-  if (typeof sbFetch !== 'function') return;
+function applyCloudConductWeeks(done) {
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) { if (done) done(); return; }
+  if (typeof sbFetch !== 'function') { if (done) done(); return; }
   sbFetch('conduct_weeks', function(rows) {
-    if (!Array.isArray(rows) || !rows.length) { renderHomeConductCard(); return; }
+    if (!Array.isArray(rows) || !rows.length) { renderHomeConductCard(); if (done) done(); return; }
     var all = loadCWeks();
     var local = [];
     var idx = {};
@@ -2314,6 +2401,7 @@ function applyCloudConductWeeks() {
     });
     saveCWeks(local);
     renderHomeConductCard();
+    if (done) done();
   });
 }
 // 首页「本周操行均分」卡片
@@ -2335,11 +2423,11 @@ function cwWeekOfYearM(now) {
   var start = new Date(now.getFullYear(), 0, 1);
   return Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
 }
-function openConductWeekView() {
+function renderMConductWeekView() {
   var list = loadCWeks();
   var body = document.getElementById('cwWeekViewBody');
   if (!body) return;
-  if (!list.length) { body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-3);font-size:12px">暂无班级操行分周数据<br>请在 PC 端上传“班级量化汇总表”后自动同步</div>'; showModal('cwWeekViewModal'); return; }
+  if (!list.length) { body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-3);font-size:12px">暂无班级操行分周数据<br>点击上方「上传量化表」或「同步云端」获取</div>'; return; }
   var allLabels = [];
   list.forEach(function(w){(w.labels||[]).forEach(function(l){ if(allLabels.indexOf(l)<0) allLabels.push(l); });});
   var h = '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:320px">' +
@@ -2352,7 +2440,78 @@ function openConductWeekView() {
   });
   h += '</table></div>';
   body.innerHTML = h;
+  try { body.scrollTop = body.scrollHeight; } catch(e) {}
+}
+function openConductWeekView() {
+  renderMConductWeekView();
   showModal('cwWeekViewModal');
+}
+function mConductScoreVal(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = parseFloat(String(v).replace(/[^\d.\-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+function mSyncConductWeek() {
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) { showToast('未开启云端同步'); renderMConductWeekView(); return; }
+  applyCloudConductWeeks(function() { renderMConductWeekView(); showToast('已同步云端最新周数据'); });
+}
+function handleMConductWeekUpload(input) {
+  var file = input.files[0]; input.value = '';
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      if (typeof XLSX === 'undefined') { showToast('表格解析库未加载，请检查网络'); return; }
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      // 解析：表头含 姓名 + 各项计分列（卫生/宿舍/晚修…）
+      var headers = (rows[0] || []).map(function(h){ return String(h).trim(); });
+      var start = 0; for (; start < headers.length; start++) if (String(headers[start]).trim()) break;
+      var nameIdx = -1;
+      for (var i = start; i < headers.length; i++) { if (headers[i].indexOf('姓名') >= 0) { nameIdx = i; break; } }
+      if (nameIdx < 0) { for (var j = start; j < headers.length; j++) { if (/学生|人员|序号/.test(headers[j])) { nameIdx = j; break; } } }
+      if (nameIdx < 0) { showToast('未识别到姓名列'); return; }
+      var labels = [];
+      headers.forEach(function(h2, idx) {
+        if (idx < start || idx === nameIdx) return;
+        var t = String(h2).trim();
+        if (!t || /总分|合计|平均|排名|名次|序号|备注|姓名/.test(t)) return;
+        labels.push({ idx: idx, name: t });
+      });
+      if (!labels.length) { showToast('未识别到计分列（如 卫生/宿舍/晚修）'); return; }
+      var stTotals = [], valsByLabel = {};
+      labels.forEach(function(l){ valsByLabel[l.name] = []; });
+      for (var r = 1; r < rows.length; r++) {
+        var rr = rows[r] || [];
+        var nm = String(rr[nameIdx] || '').trim();
+        if (!nm) continue;
+        var sum = 0;
+        labels.forEach(function(l){ var v = mConductScoreVal(rr[l.idx]); if (v !== null) { sum += v; valsByLabel[l.name].push(v); } });
+        stTotals.push({ name: nm, sum: sum });
+      }
+      if (!stTotals.length) { showToast('未识别到学生数据'); return; }
+      var overall = stTotals.reduce(function(s, x){ return s + x.sum; }, 0) / stTotals.length;
+      var averages = {};
+      labels.forEach(function(l){ var a = valsByLabel[l.name]; averages[l.name] = a.length ? a.reduce(function(s, v){ return s + v; }, 0) / a.length : 0; });
+      var ci = loadMClassInfo();
+      var week = '第' + cwWeekOfYearM(new Date()) + '周';
+      var rec = { week: week, className: ci && ci.className ? ci.className : '', teacher: ci && ci.teacher ? ci.teacher : '', overallAvg: +overall.toFixed(1), averages: averages, labels: labels.map(function(l){ return l.name; }), count: stTotals.length };
+      // 本地去重合并 + 云端 upsert
+      var list = loadCWeks();
+      var idx2 = -1;
+      for (var k = 0; k < list.length; k++) { if (list[k].week === rec.week && list[k].className === rec.className) { idx2 = k; break; } }
+      if (idx2 >= 0) list[idx2] = rec; else list.push(rec);
+      saveCWeks(list);
+      if (typeof sbEnabled === 'function' && sbEnabled() && typeof sbUpsert === 'function') {
+        sbUpsert('conduct_weeks', { className: rec.className, teacher: rec.teacher || '', week: rec.week, overall: rec.overallAvg, count: rec.count || 0, labels: rec.labels || [], averages: rec.averages || {} }, 'className,week');
+      }
+      renderMConductWeekView();
+      renderHomeConductCard();
+      showToast('已上传 ' + rec.week + ' 操行均分 ' + rec.overallAvg);
+    } catch(err) { console.error(err); showToast('解析失败：' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ---------- Supabase 扩展工具（分享携带配置 / 考勤&待办写入）----------
@@ -2392,6 +2551,16 @@ function sbFetchWhere(table, where, cb) {
     if (Array.isArray(d)) cb(d); else cb([]);
   }).catch(function(){ cb([]); });
 }
+function sbDeleteRow(table, where) {
+  var c = sbConfig();
+  if (!c.url || !c.anon) return;
+  try {
+    fetch(c.url + '/rest/v1/' + table + '?' + where, {
+      method: 'DELETE',
+      headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon, 'Prefer': 'return=minimal' }
+    }).catch(function(){});
+  } catch(e){}
+}
 function todayStr() {
   var d = new Date(), m = ('0'+(d.getMonth()+1)).slice(-2), day = ('0'+d.getDate()).slice(-2);
   return d.getFullYear() + '-' + m + '-' + day;
@@ -2425,8 +2594,9 @@ function syncMTodosFromCloud() {
     if (!input || (rows||[]).length === 0) return;
     var addRow = input.parentElement;              // .todo-add
     var container = addRow.parentElement;          // 待办所在容器
-    // 移除当前静态示例项（.todo-item）
-    Array.prototype.slice.call(container.querySelectorAll('.todo-item')).forEach(function(el){ el.remove(); });
+    // 移除当前静态示例项 / 已渲染的滑动容器（.todo-swipe）
+    Array.prototype.slice.call(container.querySelectorAll('.todo-swipe')).forEach(function(el){ el.remove(); });
+    Array.prototype.slice.call(container.querySelectorAll('.todo-item:not(.todo-inner)')).forEach(function(el){ el.remove(); });
     // 在 .todo-add 前插入云端待办
     (rows||[]).forEach(function(t) {
       var div = document.createElement('div');
@@ -2436,6 +2606,7 @@ function syncMTodosFromCloud() {
         '<div class="todo-content"><div class="todo-title">' + (t.text||'') + '</div><div class="todo-meta">云端同步事项</div></div>' +
         '<span class="todo-badge tag tag-blue">' + ((t.time_label||'待办')) + '</span>';
       container.insertBefore(div, addRow);
+      wireTodoSwipe(div, function(){ deleteTodoItem(div.parentElement); });
     });
   });
 }
@@ -2463,16 +2634,16 @@ function applySharedCollectRecords() {
     else s.conduct.d9 += r.score;
   });
 }
-applySharedCollectRecords();
-// 若已配置 Supabase，初始拉取云端记录合并（支持跨设备采集回传）
-applyCloudRecords();
-// 成绩/考证云端拉取（跨端查看）
-applyCloudScores();
-// 班级操行分周数据云端拉取（PC 上传 → 手机端查看）
-applyCloudConductWeeks();
-renderHomeConductCard();
-// 工作台待办与云端双向同步
-syncMTodosFromCloud();
+// 逐个 try/catch 隔离，防止任一同步函数抛错导致后续（含请假审批）渲染被跳过
+try { applySharedCollectRecords(); } catch(e) { console.error('applySharedCollectRecords', e); }
+try { applyCloudRecords(); } catch(e) { console.error('applyCloudRecords', e); }
+try { applyCloudScores(); } catch(e) { console.error('applyCloudScores', e); }
+try { applyCloudConductWeeks(); } catch(e) { console.error('applyCloudConductWeeks', e); }
+try { renderHomeConductCard(); } catch(e) { console.error('renderHomeConductCard', e); }
+try { syncMTodosFromCloud(); } catch(e) { console.error('syncMTodosFromCloud', e); }
+// 请假审批：初始渲染 + 云端拉取（PC 端录入 → 手机端待审）
+try { renderMLeaves(); } catch(e) { console.error('renderMLeaves', e); }
+try { syncMLeavesFromCloud(); } catch(e) { console.error('syncMLeavesFromCloud', e); }
 // 考勤：进入考勤页时若无数据，拉取当日云端
 window.addEventListener('storage', function(e) {
   if (e.key === COLLECT_CONDUCT_KEY || e.key === COLLECT_VIOLATION_KEY) {
@@ -2595,6 +2766,124 @@ function goBack() {
   }
 }
 
+// ========== 待办 右滑删除 ==========
+function wireTodoSwipe(item, onDelete) {
+  if (!item || item.__sw) return; item.__sw = true;
+  var wrap = document.createElement('div'); wrap.className = 'todo-swipe';
+  var del = document.createElement('div'); del.className = 'todo-del'; del.textContent = '删除';
+  item.classList.add('todo-inner');
+  var parent = item.parentNode; parent.insertBefore(wrap, item);
+  del.onclick = function(e){ e.stopPropagation(); if (onDelete) onDelete(); };
+  wrap.appendChild(del); wrap.appendChild(item);
+  var startX = 0, open = false;
+  function setOpen(v){ open = v; if (open) { document.querySelectorAll('.todo-inner.open').forEach(function(o){ if (o !== item) o.classList.remove('open'); }); } item.classList.toggle('open', v); }
+  item.addEventListener('touchstart', function(e){ startX = e.touches[0].clientX; }, { passive: true });
+  item.addEventListener('touchmove', function(e){ var dx = e.touches[0].clientX - startX; if (Math.abs(dx) > 12) e.preventDefault(); }, { passive: false });
+  item.addEventListener('touchend', function(e){ var dx = (e.changedTouches ? e.changedTouches[0].clientX : 0) - startX; if (dx < -40) setOpen(true); else if (dx > 40) setOpen(false); });
+  var mX = 0, mDown = false;
+  item.addEventListener('mousedown', function(e){ mDown = true; mX = e.clientX; });
+  window.addEventListener('mouseup', function(e){ if (!mDown) return; mDown = false; var dx = e.clientX - mX; if (dx < -40) setOpen(true); else if (dx > 40) setOpen(false); });
+}
+function deleteTodoItem(wrap) {
+  var item = wrap.querySelector('.todo-item');
+  if (item && item.dataset && item.dataset.id && sbEnabled && sbEnabled() && typeof sbDeleteRow === 'function') {
+    sbDeleteRow('todos', 'id=eq.' + encodeURIComponent(item.dataset.id));
+  }
+  var pr = wrap.parentNode; if (pr) pr.removeChild(wrap);
+  showToast('已删除待办');
+}
+// ========== 请假审批（本地 + 云端同步） ==========
+var MLEAVES_KEY = 'smartclass_leaves';
+function mLeavesLoad(){ try { return JSON.parse(localStorage.getItem(MLEAVES_KEY))||[]; } catch(e){ return []; } }
+function mLeavesSave(list){ try { localStorage.setItem(MLEAVES_KEY, JSON.stringify(list)); } catch(e){} }
+function mNewId(){ return (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){ var r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16); })); }
+function updateLeaveCount(){
+  var n = mLeavesLoad().length;
+  var c = document.getElementById('leaveCount'); if (c) c.innerHTML = n + '<span class="sc-unit">条</span>';
+  var t = document.getElementById('leavePendingCount'); if (t) t.textContent = n + '条待审';
+}
+function renderMLeaves(){
+  var box = document.getElementById('leaveList'); if (!box) return;
+  // 首次打开：若本地从无记录，则注入默认示例，便于演示左滑删除 / 录入后增删
+  try {
+    if (localStorage.getItem(MLEAVES_KEY) === null) {
+      mLeavesSave([
+        { id:'lv-001', name:'张三', sno:'20240301', type:'病假', time:'9月8日 14:00 — 9月9日 18:00', reason:'发烧38.5°C，家长电话请假' },
+        { id:'lv-002', name:'李四', sno:'20240305', type:'事假', time:'9月9日 08:00 — 17:00', reason:'家中有事，需回家处理' },
+        { id:'lv-003', name:'王五', sno:'20240312', type:'公假', time:'9月9日 10:00 — 16:00', reason:'代表学校参加技能竞赛' }
+      ]);
+    }
+  } catch(e){}
+  Array.prototype.slice.call(box.querySelectorAll('.todo-swipe')).forEach(function(el){ el.remove(); });
+  var list = mLeavesLoad(); updateLeaveCount();
+  if (!list.length) { box.innerHTML = '<div style="font-size:12px;color:var(--text-3);padding:10px">暂无待审批请假，点击上方「＋录入」添加</div>'; return; }
+  box.innerHTML = '';
+  list.forEach(function(l){
+    var tag = l.type==='病假'?'tag-red':(l.type==='公假'?'tag-green':'tag-blue');
+    var div = document.createElement('div');
+    div.className = 'leave-item';
+    div.dataset.id = l.id;
+    div.innerHTML =
+      '<div class="leave-row"><div><span class="leave-student">' + l.name + '</span><span style="font-size:11px;color:var(--text-3)"> ' + (l.sno||'') + '</span></div>' +
+      '<span class="tag ' + tag + '">' + l.type + '</span></div>' +
+      '<div class="leave-detail">' + (l.time||'') + '<br>' + (l.reason||'') + '</div>' +
+      '<div class="leave-actions">' +
+        '<button class="btn btn-success btn-sm" onclick="settleMLeave(\'' + l.id + '\',true)">✓ 通过</button>' +
+        '<button class="btn btn-default btn-sm" onclick="settleMLeave(\'' + l.id + '\',false)">驳回</button>' +
+      '</div>';
+    // 先挂进 DOM，再挂左滑删除（wireTodoSwipe 依赖 parentNode，脱离文档时会抛错导致列表为空）
+    box.appendChild(div);
+    wireTodoSwipe(div, function(){ deleteMLeave(div); });
+  });
+}
+function removeMLeaveById(id){
+  var list = mLeavesLoad().filter(function(l){ return l.id !== id; });
+  mLeavesSave(list);
+  if (id && sbEnabled && sbEnabled() && typeof sbDeleteRow === 'function') sbDeleteRow('leaves', 'id=eq.' + encodeURIComponent(id));
+  renderMLeaves();
+}
+function settleMLeave(id, pass){
+  removeMLeaveById(id);
+  showToast(pass ? '已通过请假审批' : '已驳回该请假');
+}
+function deleteMLeave(div){
+  removeMLeaveById(div && div.dataset ? div.dataset.id : '');
+  showToast('已删除请假');
+}
+function openLeaveInput(){
+  var sel = document.getElementById('leaveStudentSelect');
+  if (sel && sel.options.length < 2 && students.length) {
+    sel.innerHTML = '<option value="">请选择学生</option>' + students.map(function(s){ return '<option value="' + s.name + '">' + s.name + ' (' + s.id + ')</option>'; }).join('');
+  }
+  showModal('leaveInputModal');
+}
+function addMLeave(){
+  var nm = document.getElementById('leaveStudentSelect').value;
+  if (!nm) { showToast('请选择学生'); return; }
+  var s = students.find(function(x){ return x.name === nm; });
+  var lv = {
+    id: mNewId(),
+    name: nm,
+    sno: s ? s.fullId : '',
+    type: document.getElementById('leaveTypeSelect').value || '病假',
+    time: document.getElementById('leaveTimeInput').value.trim() || '时间待定',
+    reason: document.getElementById('leaveReasonInput').value.trim() || '请假原因待补充'
+  };
+  var list = mLeavesLoad(); list.unshift(lv); mLeavesSave(list);
+  if (sbEnabled && sbEnabled() && typeof sbInsertRow === 'function') sbInsertRow('leaves', { id: lv.id, name: lv.name, sno: lv.sno, type: lv.type, time: lv.time, reason: lv.reason, ts: new Date().toISOString() });
+  document.getElementById('leaveReasonInput').value = '';
+  hideModal('leaveInputModal');
+  renderMLeaves();
+  showToast('已录入 ' + nm + ' 请假');
+}
+function syncMLeavesFromCloud(){
+  if (!sbEnabled || !sbEnabled() || typeof sbFetchWhere !== 'function') return;
+  sbFetchWhere('leaves', 'order=ts.desc', function(rows){
+    if (!(rows||[]).length) return;
+    mLeavesSave((rows||[]).map(function(r){ return { id: r.id, name: r.name, sno: r.sno||'', type: r.type||'病假', time: r.time||'', reason: r.reason||'' }; }));
+    renderMLeaves();
+  });
+}
 // ========== Dashboard ==========
 function toggleTodo(el) {
   el.classList.toggle('done');
@@ -2617,6 +2906,7 @@ function addTodo() {
   div.innerHTML = `<div class="todo-check" onclick="toggleTodo(this)"></div><div class="todo-content"><div class="todo-title">${text}</div><div class="todo-meta">刚刚添加</div></div>`;
   list.parentElement.insertBefore(div, list);
   input.value = '';
+  wireTodoSwipe(div, function(){ deleteTodoItem(div.parentElement); });
   // 云端同步（PC/手机端共享同一待办库）
   if (sbEnabled && sbEnabled()) {
     sbInsertRow('todos', { id: id, text: text, done: false, time_label: '' });
@@ -2705,7 +2995,7 @@ function initMAttendance() {
 
 function cycleMAttendance(id) {
   if (mAttEnded) return;
-  const states = ['unchecked','present','leave','unchecked'];
+  const states = ['unchecked','present','absent','leave','unchecked'];
   const cur = mAttStates[id];
   const next = states[states.indexOf(cur)+1];
   mAttStates[id] = next;
@@ -3373,7 +3663,54 @@ function fallbackCopy(text) {
 
 function showModal(id) { document.getElementById(id).classList.add('show'); }
 function hideModal(id) { document.getElementById(id).classList.remove('show'); }
-function showClassSettingsSheet() { showModal('classSettingsSheet'); }
+function showClassSettingsSheet() {
+  applyMClassInfoInputs();
+  showModal('classSettingsSheet');
+}
+
+// ================== 班级信息云端同步（localStorage + Supabase class_settings）==================
+var CLASS_INFO_KEY = 'smartclass_classinfo';
+function loadMClassInfo() {
+  try { var d = localStorage.getItem(CLASS_INFO_KEY); return d ? JSON.parse(d) : {}; } catch(e) { return {}; }
+}
+function saveMClassInfo(o) { try { localStorage.setItem(CLASS_INFO_KEY, JSON.stringify(o)); } catch(e){} }
+function mField(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function collectMClassInfo() {
+  return { className: mField('csClassName'), grade: mField('csGrade'), major: mField('csMajor'), teacher: mField('csTeacher'), count: mField('csCount') };
+}
+function applyMClassInfoInputs() {
+  var o = loadMClassInfo();
+  ['csClassName','csGrade','csMajor','csTeacher','csCount'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el && o[id] !== undefined) el.value = o[id];
+  });
+}
+function applyMClassInfoTitle() {
+  var o = loadMClassInfo();
+  var gsub = document.querySelector('.g-sub'), role = document.querySelector('.profile-role');
+  if (o.className) {
+    if (gsub) gsub.innerHTML = o.className + ' · ' + (o.count || '58') + '人';
+    if (role) role.textContent = '班主任 · ' + o.className;
+  }
+}
+function saveMClassInfoCloud() {
+  var o = collectMClassInfo();
+  saveMClassInfo(o);
+  applyMClassInfoTitle();
+  var on = (typeof sbEnabled === 'function' && sbEnabled());
+  if (on) sbUpsert('class_settings', { key: 'classInfo', value: JSON.stringify(o) }, 'key');
+  showToast('班级信息已保存' + (on ? '并已同步云端' : '（本地）'));
+  hideModal('classSettingsSheet');
+}
+function applyCloudClassInfo() {
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) return;
+  sbFetchWhere('class_settings', 'key=eq.classInfo', function(rows) {
+    var r = (rows || [])[0];
+    if (!r || !r.value) return;
+    var o; try { o = JSON.parse(r.value); } catch(e) { return; }
+    if (o && typeof o === 'object') { saveMClassInfo(o); applyMClassInfoInputs(); applyMClassInfoTitle(); }
+  });
+}
 function showSbConfigSheet() {
   try {
     var c = sbConfig();
@@ -3391,7 +3728,7 @@ function saveSbConfigMobile() {
   try { localStorage.setItem('smartclass_supabase_url', url); localStorage.setItem('smartclass_supabase_anon', anon); } catch(e){}
   status.textContent = '已保存并启用云端同步 ✓';
   // 保存后立即拉取云端数据合并到本地展示
-  try { applyCloudRecords(); syncMTodosFromCloud(); applyCloudScores(); applyCloudConductWeeks(); renderHomeConductCard(); } catch(e){}
+  try { applyCloudRecords(); syncMTodosFromCloud(); renderMLeaves(); syncMLeavesFromCloud(); applyCloudScores(); applyCloudConductWeeks(); renderHomeConductCard(); } catch(e){}
   setTimeout(function(){ hideModal('sbConfigSheet'); }, 800);
   showToast('云端同步已启用');
 }
@@ -3457,6 +3794,85 @@ function showShareModal() {
 }
 function showExportAbsentModal() { showModal('exportAbsentModal'); }
 
+// ========== 手机端真实 Excel(.xlsx) 导出（SheetJS） ==========
+function mExportTs() { var d=new Date(), M=('0'+(d.getMonth()+1)).slice(-2), D=('0'+d.getDate()).slice(-2), h=('0'+d.getHours()).slice(-2), mi=('0'+d.getMinutes()).slice(-2); return ''+d.getFullYear()+M+D+'_'+h+mi; }
+function mExportSheet(filename, headers, aoa) {
+  if (typeof XLSX === 'undefined') { showToast('表格库未加载，请检查网络'); return; }
+  var ws = XLSX.utils.aoa_to_sheet([headers].concat(aoa));
+  ws['!cols'] = headers.map(function(h) { return { wch: Math.max(10, String(h).length * 2 + 4) }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename + '.xlsx');
+  showToast('已导出 ' + filename + '.xlsx');
+}
+var M_EXPORT_DIMS = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11'];
+function mFindSt(id) { return students.find(function(s){ return s.id === id || s.fullId === id; }); }
+// —— 通用目标选择弹窗 ——
+var M_EXPORT_CB = null;
+function openExportPick(title, items, cb) {
+  M_EXPORT_CB = cb;
+  document.getElementById('mExportPickTitle').textContent = title;
+  document.getElementById('mExportPickSelect').innerHTML = items.map(function(it) { return '<option value="' + it.value + '">' + it.label + '</option>'; }).join('');
+  showModal('mExportPickModal');
+}
+function confirmExportPick() {
+  var v = document.getElementById('mExportPickSelect').value;
+  hideModal('mExportPickModal');
+  if (M_EXPORT_CB) M_EXPORT_CB(v);
+}
+// 考勤：选日期
+function mExportAttendancePick() {
+  var map = mAttLocalLoad();
+  var dates = Object.keys(map).filter(function(d){ var o=map[d]; return o && Object.keys(o).length; }).sort().reverse();
+  if (!dates.length) dates = [mAttDate];
+  openExportPick('选择考勤日期', dates.map(function(d) { return { label: '📅 ' + d, value: d }; }), function(date) { mExportAttendanceXlsx(date); });
+}
+function mExportAttendanceXlsx(date) {
+  var map = mAttLocalLoad(), day = map[date] || {};
+  var aoa = [], used = 0;
+  Object.keys(day).forEach(function(id) {
+    var st = day[id], label = st === 'present' ? '出勤' : st === 'leave' ? '请假' : st === 'absent' ? '缺席' : '';
+    if (!label) return;
+    var s = mFindSt(id); aoa.push([id, s ? s.name : '', label]); used++;
+  });
+  if (!used) { showToast('该日期暂无考勤记录'); return; }
+  mExportSheet('考勤记录_' + date.replace(/-/g, '') + '_' + mExportTs(), ['学号', '姓名', '状态'], aoa);
+}
+// 操行：选周次（导出当前学生维度表，文件名带周次）
+function mExportConductPick() {
+  var wk = cwWeekOfYearM ? cwWeekOfYearM(new Date()) : 8;
+  var items = []; for (var w = 1; w <= 20; w++) items.push({ label: '第' + w + '周' + (w === wk ? '（本周）' : ''), value: w });
+  openExportPick('选择操行报表周次', items, function(week) { mExportConductXlsx(week); });
+}
+function mExportConductXlsx(week) {
+  var headers = ['学号', '姓名', '寝室'].concat(M_EXPORT_DIMS.map(function(d) { return ccDimNames[d]; })).concat(['总分']);
+  var aoa = students.map(function(s) {
+    return [s.fullId, s.name, s.dorm].concat(M_EXPORT_DIMS.map(function(d) { return s.conduct[d] || 0; })).concat([mConductNet(s)]);
+  });
+  mExportSheet('操行报表_第' + week + '周_' + mExportTs(), headers, aoa);
+}
+function mExportLeaveXlsx() {
+  var list = (typeof mLeavesLoad === 'function' ? mLeavesLoad() : []);
+  var leaves = list.length ? list.map(function(l){ return [l.name||'', l.type||'', l.reason||'', '待审批']; })
+    : [['张三', '病假', '发烧38.5°C，家长电话请假', '待审批'], ['李四', '事假', '参加技能比赛培训', '待审批'], ['王五', '病假', '急性肠胃炎请假半天', '待审批']];
+  mExportSheet('请假记录_' + mExportTs(), ['姓名', '请假类型', '原因', '状态'], leaves);
+}
+// 档案：选单个学生或全部
+function mExportArchivePick() {
+  var items = [{ label: '👥 全部学生（' + students.length + '人）', value: 'all' }];
+  students.forEach(function(s) { items.push({ label: s.name + ' · ' + s.fullId, value: s.fullId }); });
+  openExportPick('选择要导出的学生', items, function(sel) { mExportArchiveXlsx(sel); });
+}
+function mExportArchiveXlsx(sel) {
+  var arr = (sel && sel !== 'all') ? students.filter(function(s){ return s.fullId === sel; }) : students;
+  var headers = ['学号', '姓名', '寝室', '性别', '电话', '住址', '违纪次数', '操行总分', '照片'];
+  var aoa = arr.map(function(s) {
+    return [s.fullId, s.name, s.dorm, s.gender, s.phone, s.address, (s.violations||[]).length, mConductNet(s), s.hasPhoto ? '有' : '无'];
+  });
+  var fn = (sel && sel !== 'all') ? '学生档案_' + (arr[0] ? arr[0].name : '') + '_' : '学生档案_全体_';
+  mExportSheet(fn + mExportTs(), headers, aoa);
+}
+
 function showPhotoPreview(src) {
   let overlay = document.getElementById('photoPreviewOverlay');
   if (!overlay) {
@@ -3501,6 +3917,19 @@ function mCleanNames(v){
 }
 function mLoadDuty(){
   try{ const d=localStorage.getItem(DUTY_KEY); return d? JSON.parse(d): []; }catch(e){ return []; }
+}
+function mSaveDuty(duty){
+  try { localStorage.setItem(DUTY_KEY, JSON.stringify(duty)); } catch(e){}
+  if (typeof sbEnabled === 'function' && sbEnabled()) sbUpsert('class_settings', { key:'dutySchedule', value: JSON.stringify(duty) }, 'key');
+}
+function applyCloudDuty(){
+  if (typeof sbEnabled !== 'function' || !sbEnabled()) return;
+  sbFetchWhere('class_settings', 'key=eq.dutySchedule', function(rows){
+    var r = (rows || [])[0];
+    if (!r || !r.value) return;
+    var duty; try { duty = JSON.parse(r.value); } catch(e){ return; }
+    if (Array.isArray(duty) && duty.length) { mSaveDuty(duty); if (typeof mRenderDuty==='function') mRenderDuty(); }
+  });
 }
 function mTodayDutyName(){ return DUTY_DAY_NAMES[new Date().getDay()]; }
 function mDutyPeopleCount(items){ return items.reduce((s,it)=>s + (it.people? it.people.split('、').filter(Boolean).length:0),0); }
@@ -3570,7 +3999,7 @@ function handleMDutyUpload(input){
         duty.push({label, items});
       }
       if(!duty.length){ showToast('未能识别值日表，请确保表格含“星期X”和分工列'); return; }
-      localStorage.setItem(DUTY_KEY,JSON.stringify(duty));
+      mSaveDuty(duty);
       const area=document.getElementById('mDutyResult'), ph=document.getElementById('mDutyPlaceholder');
       ph.style.display='none'; area.style.display='';
       area.innerHTML=`<div style="font-size:12px;color:var(--success-dark);padding:4px 0">✅ 解析成功：${file.name} · ${duty.length} 天分工</div>`;
@@ -3591,12 +4020,19 @@ function showToast(msg) {
 }
 
 // ========== Init ==========
+// 今日待办：为静态(未挂载)示例项挂载右滑删除；幂等，重复调用安全
+function wireTodoBottom(){
+  Array.prototype.slice.call(document.querySelectorAll('.card-body .todo-item:not(.todo-inner)')).forEach(function(it){
+    wireTodoSwipe(it, function(){ deleteTodoItem(it.parentElement); });
+  });
+}
 document.addEventListener('DOMContentLoaded', () => {
-  mRenderDuty();
-  initMAttendance();
-  initConductCards();
-  initMStudentTable();
-  updateTopbar('home');
+  ['mRenderDuty','initMAttendance','initConductCards','initMStudentTable','updateTopbar'].forEach(function(fn){
+    try { if (typeof window[fn]==='function') window[fn]('home'); } catch(e) { console.error(fn, e); }
+  });
+  wireTodoBottom();
+  try { renderMLeaves(); } catch(e) { console.error('renderMLeaves(DCL)', e); }
+  try { syncMLeavesFromCloud(); } catch(e) { console.error('syncMLeavesFromCloud(DCL)', e); }
   setTimeout(function() {
     try {
       var rawHash = location.hash;
