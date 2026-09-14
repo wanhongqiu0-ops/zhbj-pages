@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>智慧班级管家 - 手机端</title>
 <meta name="theme-color" content="#2563eb">
 <link rel="manifest" href="manifest.webmanifest">
@@ -99,10 +99,20 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
     height: 100dvh;
     padding-top: env(safe-area-inset-top, 0px);
   }
-  /* 真机底部：抬高底部菜单栏，避开系统手势条 / 导航区，保证 5 个模块按钮完整显示 */
+  /* 真机底部菜单栏：改为固定吸底，脱离 app-container 高度计算，
+     即使浏览器地址栏导致 100vh/dvh 偏大，菜单栏也不会被顶出可见区而“消失” */
   .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 14px);
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  }
+  /* 内容底部预留菜单栏高度，避免被固定吸底的菜单栏遮挡 */
+  .page {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
   /* 真机底部弹层：上移避开手势条，不被底栏遮挡（导出缺席、操行均分对比等底部抽屉） */
   .modal-mask {
