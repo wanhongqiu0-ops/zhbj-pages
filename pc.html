@@ -2264,7 +2264,7 @@ function saveAttRecord(){
   Object.keys(attStates).forEach(function(id){ var st=attStates[id]; if(st==='unchecked') return; if(day[id]!==st) day[id]=st; });
   local[attDate]=day; attLocalSave(local);
   if(sbEnabled && sbEnabled()){
-    Object.keys(day).forEach(function(id){ if(day[id]!=='unchecked') sbUpsert('attendance_records',{att_date:attDate,full_id:id,status:day[id]},'att_date,full_id'); });
+    Object.keys(day).forEach(function(id){ if(day[id]!=='unchecked') sbUpsert('attendance_records',{att_date:todayStr(),full_id:id,status:day[id]},'att_date,full_id'); });
   }
   showToast('已保存 '+attDate+' 的考勤记录');
 }
@@ -2324,11 +2324,11 @@ function cycleAttendance(id) {
   const btn = document.querySelector(`.att-btn[data-id="${id}"]`);
   btn.className = 'att-btn ' + next;
   updateAttStats();
-  // 保存到本地（按日期）并同步云端
+  // 保存到本地（按日期）并同步云端（云端一律写当天，避免跨日不同步）
   if (next !== 'unchecked') {
     var lm=attLocalLoad(); var dm=lm[attDate]||{}; dm[id]=next; lm[attDate]=dm; attLocalSave(lm);
     if (sbEnabled() && next !== 'unchecked') {
-      sbUpsert('attendance_records', { att_date: attDate, full_id: id, status: next }, 'att_date,full_id');
+      sbUpsert('attendance_records', { att_date: todayStr(), full_id: id, status: next }, 'att_date,full_id');
     }
   }
 }

@@ -2977,7 +2977,7 @@ function saveMAttRecord(){
   local[mAttDate]=day; mAttLocalSave(local);
   if(sbEnabled && sbEnabled()){
     Object.keys(day).forEach(function(id){
-      if(day[id]!=='unchecked') sbUpsert('attendance_records',{att_date:mAttDate,full_id:id,status:day[id]},'att_date,full_id');
+      if(day[id]!=='unchecked') sbUpsert('attendance_records',{att_date:todayStr(),full_id:id,status:day[id]},'att_date,full_id');
     });
   }
   showToast('已保存 '+mAttDate+' 的考勤记录');
@@ -3056,7 +3056,7 @@ function cycleMAttendance(id) {
   // 保存到本地（按日期）并同步云端
   if (next !== 'unchecked') {
     var lm2=mAttLocalLoad(); var dm2=lm2[mAttDate]||{}; dm2[id]=next; lm2[mAttDate]=dm2; mAttLocalSave(lm2);
-    if (sbEnabled && sbEnabled()) sbUpsert('attendance_records', { att_date: mAttDate, full_id: id, status: next }, 'att_date,full_id');
+    if (sbEnabled && sbEnabled()) sbUpsert('attendance_records', { att_date: todayStr(), full_id: id, status: next }, 'att_date,full_id');
   }
   // Haptic feedback simulation
   if (navigator.vibrate) navigator.vibrate(10);
