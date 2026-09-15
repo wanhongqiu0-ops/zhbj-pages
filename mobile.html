@@ -549,6 +549,21 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .heat-card .hc-score { font-size: 20px; font-weight: 700; margin: 4px 0; }
 .heat-card .hc-detail { font-size: 10px; color: var(--text-3); }
 
+/* 看板：个人学生卡片（可滚动查看更多） */
+.m-kanban-cards { max-height: 460px; overflow-y: auto; }
+.m-kanban-cards .mk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.m-kanban-cards .mk-card { background: #fff; border-radius: var(--radius-sm); padding: 10px; box-shadow: var(--shadow); position: relative; }
+.m-kanban-cards .mk-card .mk-score { position: absolute; top: 10px; right: 10px; font-size: 16px; font-weight: 700; }
+.m-kanban-cards .mk-card .mk-score.good { color: var(--success-dark); }
+.m-kanban-cards .mk-card .mk-score.warn { color: var(--orange); }
+.m-kanban-cards .mk-card .mk-score.bad { color: var(--danger); }
+.m-kanban-cards .mk-card .mk-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.m-kanban-cards .mk-card .mk-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.m-kanban-cards .mk-card .mk-name { font-size: 13px; font-weight: 600; }
+.m-kanban-cards .mk-card .mk-id { font-size: 10px; color: var(--text-3); }
+.m-kanban-cards .mk-card .mk-dim { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); padding: 1px 0; }
+.m-kanban-cards .mk-card .mk-dim .mk-dv { font-weight: 700; }
+
 .info-stream { max-height: 200px; overflow-y: auto; }
 .info-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
 .info-item .ii-time { color: var(--text-3); white-space: nowrap; font-size: 11px; }
@@ -1387,7 +1402,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="font-size:13px;color:var(--text-2)">周次</span>
           <select class="form-select" id="mConductWeekSelect" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;" onchange="mOnConductWeekChange()"></select>
-          <script>try{var _ws=document.getElementById('mConductWeekSelect');if(_ws){var _cw=(typeof cwWeekOfYearM==='function'?cwWeekOfYearM(new Date()):1);var _hh='';for(var _w=1;_w<=21;_w++){_hh+='<option value="'+_w+'">第'+_w+'周'+(_w===_cw?'（本周）':'')+'</option>';}_ws.innerHTML=_hh;}}catch(e){}</script>
+          <script>try{var _ws=document.getElementById('mConductWeekSelect');if(_ws){var _cw=(typeof cwWeekOfYearM==='function'?cwWeekOfYearM(new Date()):1);var _hh='<option value="">全部（累计）<\/option>';for(var _w=1;_w<=21;_w++){_hh+='<option value="'+_w+'">第'+_w+'周'+(_w===_cw?'（本周）':'')+'</option>';}_ws.innerHTML=_hh;}}catch(e){}</script>
         </div>
 
         <!-- Table Mode -->
@@ -1407,6 +1422,9 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
             <div class="cb-title">班级扣分分布<span style="font-size:11px;color:var(--text-3)">本周</span></div>
             <div class="kanban-chart" id="mDeductChart" _echarts_instance_="ec_1788870386731" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); position: relative;"><div style="position: relative; width: 311px; height: 200px; padding: 0px; margin: 0px; border-width: 0px; cursor: default;"><canvas data-zr-dom-id="zr_0" width="466" height="300" style="position: absolute; left: 0px; top: 0px; width: 311px; height: 200px; user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); padding: 0px; margin: 0px; border-width: 0px;"></canvas></div><div class="" style="position: absolute; display: block; border-style: solid; white-space: nowrap; z-index: 9999999; box-shadow: rgba(0, 0, 0, 0.2) 1px 2px 10px; transition: opacity 0.2s cubic-bezier(0.23, 1, 0.32, 1), visibility 0.2s cubic-bezier(0.23, 1, 0.32, 1), transform 0.4s cubic-bezier(0.23, 1, 0.32, 1); background-color: rgb(255, 255, 255); border-width: 1px; border-radius: 4px; color: rgb(102, 102, 102); font: 14px / 21px &quot;Microsoft YaHei&quot;; padding: 10px; top: 0px; left: 0px; transform: translate3d(83px, 110px, 0px); border-color: rgb(255, 255, 255); pointer-events: none; visibility: hidden; opacity: 0;">宿舍卫生: 扣40分</div></div>
           </div>
+
+          <div class="section-title">个人画像卡片 <span style="font-size:11px;color:var(--text-3);font-weight:400">上滑查看更多</span></div>
+          <div class="m-kanban-cards"><div class="mk-grid" id="mKanbanStudentCards"></div></div>
 
           <div class="section-title">宿舍热力预警</div>
           <div class="heat-grid" id="mHeatGrid"><div class="heat-card"><div class="hc-title">宿舍 101</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 102</div><div class="hc-score" style="color:var(--success-dark)">9.2</div><div class="hc-detail">6人 · 均扣0.8分</div></div><div class="heat-card"><div class="hc-title">宿舍 103</div><div class="hc-score" style="color:var(--success-dark)">8.5</div><div class="hc-detail">6人 · 均扣1.5分</div></div><div class="heat-card"><div class="hc-title">宿舍 104</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 105</div><div class="hc-score" style="color:var(--success-dark)">8.7</div><div class="hc-detail">6人 · 均扣1.3分</div></div><div class="heat-card"><div class="hc-title">宿舍 106</div><div class="hc-score" style="color:var(--success-dark)">9.8</div><div class="hc-detail">6人 · 均扣0.2分</div></div><div class="heat-card"><div class="hc-title">宿舍 107</div><div class="hc-score" style="color:var(--success-dark)">10.0</div><div class="hc-detail">6人 · 均扣0.0分</div></div><div class="heat-card"><div class="hc-title">宿舍 108</div><div class="hc-score" style="color:var(--success-dark)">9.0</div><div class="hc-detail">6人 · 均扣1.0分</div></div><div class="heat-card"><div class="hc-title">宿舍 109</div><div class="hc-score" style="color:var(--success-dark)">9.3</div><div class="hc-detail">6人 · 均扣0.7分</div></div><div class="heat-card"><div class="hc-title">宿舍 1010</div><div class="hc-score" style="color:var(--success-dark)">8.8</div><div class="hc-detail">4人 · 均扣1.3分</div></div></div>
@@ -2268,7 +2286,19 @@ var MC_ALL = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
 function mWeekTpl(){ try { if (!_mWeekTpl) _mWeekTpl = JSON.parse(localStorage.getItem('smartclass_conduct_weektpl')||'null') || {}; } catch(e){ _mWeekTpl = {}; } return _mWeekTpl; }
 function mSaveWeekTpl(){ try { localStorage.setItem('smartclass_conduct_weektpl', JSON.stringify(_mWeekTpl)); } catch(e){} }
 function mCurrentWeek(){ var s = document.getElementById('mConductWeekSelect'); return (s && s.value) ? s.value : ''; }
-function mMergeToWeekTplFromCloud(arr){ try { var obj = JSON.parse(arr||'{}'); if(!obj || typeof obj!=='object') return; var cur = mWeekTpl(); Object.keys(obj).forEach(function(w){ cur[w] = obj[w]; }); _mWeekTpl = cur; mSaveWeekTpl(); } catch(e){} }
+function mMergeToWeekTplFromCloud(arr){
+  try {
+    var obj = JSON.parse(arr||'{}'); if(!obj || typeof obj!=='object') return;
+    var cur = mWeekTpl(); Object.keys(obj).forEach(function(w){ cur[w] = obj[w]; });
+    _mWeekTpl = cur; mSaveWeekTpl();
+    // 拉取到 PC 端上传的按周模板快照后，重渲染当前品德操行视图（表格/看板），让数据即时可见
+    try {
+      var kanbanEl = document.getElementById('conductKanbanMode');
+      if (kanbanEl && kanbanEl.style.display !== 'none') { if (typeof initMCharts === 'function') initMCharts(); }
+      else if (typeof initConductCards === 'function') initConductCards();
+    } catch(e){}
+  } catch(e){}
+}
 function pullMWeekTplCloud(){
   if (typeof sbEnabled !== 'function' || !sbEnabled() || typeof sbFetchWhere !== 'function') return;
   sbFetchWhere('class_settings', 'key=eq.conductWeekTpl', function(rows){ try { if (rows && rows.length && rows[0].value) mMergeToWeekTplFromCloud(rows[0].value); } catch(e){} });
@@ -2298,6 +2328,17 @@ function mWeekDimVal(s, wk, k) {
   var sn = (mWeekTpl()[String(wk)] || {})[s.fullId];
   var v = (sn && sn.dims && sn.dims[k] !== undefined) ? sn.dims[k] : cm[k];
   return v || 0;
+}
+// “全部（累计）”仅读取展示：某学生某维度在 1~21 周的数据总和（周模板快照 + 当周收集记录）
+function mAllWeekDim(s, k) {
+  var sum = 0;
+  for (var w = 1; w <= 21; w++) sum += mWeekDimVal(s, String(w), k);
+  return sum;
+}
+function mAllWeekTotal(s) {
+  var add = 0, ded = 0;
+  MC_ALL.forEach(function(k){ var v = mAllWeekDim(s, k); if (MC_ADD.indexOf(k) >= 0) add += v; else ded += v; });
+  return add - ded;
 }
 function mWeekMatrix(wk){
   var m = {};
@@ -2720,6 +2761,8 @@ function applySharedCollectRecords() {
 // 逐个 try/catch 隔离，防止任一同步函数抛错导致后续（含请假审批）渲染被跳过
 try { applySharedCollectRecords(); } catch(e) { console.error('applySharedCollectRecords', e); }
 try { applyCloudRecords(); } catch(e) { console.error('applyCloudRecords', e); }
+// 拉取云端按周模板快照（PC/手机两端共享模板导入的品德操行分数据），拉取后刷新当前视图
+try { pullMWeekTplCloud(); } catch(e) { console.error('pullMWeekTplCloud', e); }
 try { applyCloudScores(); } catch(e) { console.error('applyCloudScores', e); }
 try { applyCloudConductWeeks(); } catch(e) { console.error('applyCloudConductWeeks', e); }
 try { renderHomeConductCard(); } catch(e) { console.error('renderHomeConductCard', e); }
@@ -3143,8 +3186,12 @@ function initConductCards() {
   const list = document.getElementById('conductCardList');
   list.innerHTML = '';
   const _wk = mCurrentWeek();
+  // 未选周(全部)：只读展示各周合计；选了具体周：可录入修改该周数据
+  const readonly = !_wk;
+  const valOf = (s, key) => readonly ? mAllWeekDim(s, key) : mWeekDimVal(s, _wk, key);
+  const totalOf = (s) => readonly ? mAllWeekTotal(s) : mWeekTotal(s, _wk);
   students.slice(0, 15).forEach(s => {
-    const score = mWeekTotal(s, _wk);
+    const score = totalOf(s);
     const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
     card.className = 'conduct-card-item';
@@ -3160,7 +3207,8 @@ function initConductCards() {
       <div class="cci-dims">
         ${[['d1','黑板报','add'],['d2','好人好事','add'],['d4','班干部','add'],['d6','班级卫生','sub'],['d7','宿舍/手机','sub'],['d8','晚修纪律','sub'],['d9','课堂/作业','sub'],['d11','出勤/仪容','sub']].map(function(d){
           var key=d[0], lab=d[1], pos=(d[2]==='add');
-          var v=mWeekDimVal(s,_wk,key);
+          var v=valOf(s,key);
+          if (readonly) return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><span class="cd-val" style="font-weight:700;color:'+(pos?'var(--success-dark)':'var(--danger)')+'">'+(v||0)+'</span></div>';
           return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><input id="cdIn_'+s.fullId+'_'+key+'" type="number" class="cd-input" value="'+v+'" min="0" style="'+(pos?'color:var(--success-dark);':'color:var(--danger);')+'" oninput="mAdjustConduct(\''+s.fullId+'\',\''+key+'\',this)"></div>';
         }).join('')}
         <div class="cci-dim"><span class="cd-label">总分</span><span id="cdScoreDim_${s.fullId}" class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
@@ -3294,6 +3342,50 @@ function initMCharts() {
     ];
     is.innerHTML = events.map(e=>`<div class="info-item"><span class="ii-time">${e.t}</span><span class="ii-content"><span class="ii-name">${e.n}</span> ${e.a} <span style="color:var(--danger);font-weight:600">${e.d}</span></span></div>`).join('');
   }
+  // 个人学生卡片：与 PC 端看板同步（选周随周联动；全部时显示各周总和；可滚动查看更多）
+  initMKanbanCards();
+}
+
+// 手机看板：个人学生卡片
+function initMKanbanCards() {
+  const grid = document.getElementById('mKanbanStudentCards');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const _wk = mCurrentWeek();
+  const readonly = !_wk;
+  const totalOf = (s) => readonly ? mAllWeekTotal(s) : mWeekTotal(s, _wk);
+  const dimOf = (s, k) => readonly ? mAllWeekDim(s, k) : mWeekDimVal(s, _wk, k);
+  const dims = [
+    { label: '班级卫生', key: 'd6', pos: false },
+    { label: '宿舍/手机', key: 'd7', pos: false },
+    { label: '晚修纪律', key: 'd8', pos: false },
+    { label: '课堂/作业', key: 'd9', pos: false },
+    { label: '出勤/仪容', key: 'd11', pos: false },
+    { label: '班干部', key: 'd2', pos: true },
+  ];
+  students.slice(0, 30).forEach(s => {
+    const score = totalOf(s);
+    const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
+    const card = document.createElement('div');
+    card.className = 'mk-card';
+    card.innerHTML = `
+      <div class="mk-score ${sc}">${score}</div>
+      <div class="mk-head">
+        <div class="mk-avatar" style="background:${s.color}">${s.name[0]}</div>
+        <div>
+          <div class="mk-name">${s.name}</div>
+          <div class="mk-id">${s.id} · ${s.dorm}</div>
+        </div>
+      </div>
+      ${dims.map(d => {
+        const v = dimOf(s, d.key);
+        const color = d.pos ? (v > 0 ? 'var(--success-dark)' : 'var(--text-3)') : (v > 0 ? 'var(--danger)' : 'var(--text-3)');
+        const show = (d.pos ? (v > 0 ? '+' + v : '0') : (v > 0 ? '-' + v : '0'));
+        return `<div class="mk-dim"><span>${d.label}</span><span class="mk-dv" style="color:${color}">${show}</span></div>`;
+      }).join('')}
+    `;
+    grid.appendChild(card);
+  });
 }
 
 // ========== Students ==========

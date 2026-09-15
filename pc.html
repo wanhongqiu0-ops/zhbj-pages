@@ -1875,7 +1875,7 @@ function applyCloudRecords() {
       s.conduct[r.dim] += r.score;
       s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
     });
-    try { initConductTable(); if (typeof initKanbanCharts==='function') initKanbanCharts(); } catch(e){}
+    try { renderCurrentConductView(); if (typeof initKanbanCharts==='function') initKanbanCharts(); } catch(e){}
     populateConductWeekSelect();
   });
   sbFetch('violation_records', function(rows) {
@@ -2095,7 +2095,7 @@ window.addEventListener('storage', function(e) {
     applySharedCollectRecords();
     populateConductWeekSelect();
     try {
-      initConductTable(); initStudentTable();
+      renderCurrentConductView(); initStudentTable();
       if (typeof switchConductMode !== 'undefined') { var cur = document.querySelector('.conduct-tab.active'); if (cur && cur.textContent.indexOf('看板')!==-1) initKanbanCharts(); }
     } catch(err) { /* 忽略非关键重绘错误 */ }
   }
@@ -2408,6 +2408,17 @@ function pcWeekTotal(s, wk){
   });
   return add - ded;
 }
+// “全部（累计）”仅读取展示：某学生某维度在 1~21 周的数据总和（周模板快照 + 当周收集记录）
+function pcAllWeekDim(s, k) {
+  var sum = 0;
+  for (var w = 1; w <= 21; w++) sum += pcWeekDimVal(s, String(w), k);
+  return sum;
+}
+function pcAllWeekTotal(s) {
+  var add = 0, ded = 0;
+  CONDUCT_ALL_DIMS.forEach(function(k){ var v = pcAllWeekDim(s, k); if (CONDUCT_ADD_DIMS.indexOf(k) >= 0) add += v; else ded += v; });
+  return add - ded;
+}
 // 某学生某周某个维度的数值：选周时取“该周模板快照优先，否则当周收集记录”；未选周(累计)取累计 s.conduct[k]
 function pcWeekDimVal(s, wk, k) {
   if (!wk) return (s.conduct[k] || 0);
@@ -2470,17 +2481,20 @@ function PcConductNotesHtml(s) {
   return parts.join('') || '—';
 }
 function initConductTable() {
+  // “全部（累计）”：只读展示各周填入数据的合计（周模板快照 + 各周收集记录），不提供手动录入
   const tbody = document.getElementById('conductTableBody');
   tbody.innerHTML = '';
-  // Sort by net total descending for ranking
-  const sorted = [...students].sort((b, a) => netConductTotal(b) - netConductTotal(a));
+  const isAdd = k => CONDUCT_ADD_DIMS.indexOf(k) !== -1;
+  // Sort by all-weeks total descending for ranking
+  const sorted = [...students].sort((b, a) => pcAllWeekTotal(b) - pcAllWeekTotal(a));
   const rankMap = {};
   sorted.forEach((s, i) => rankMap[s.id] = i + 1);
 
-  students.forEach((s, idx) => {
+  students.forEach((s) => {
     const tr = document.createElement('tr');
     const avatarColor = s.color;
-    const numCell = dim => '<td><input type="number" class="cell-input" value="'+(s.conduct[dim]||0)+'" oninput="PcConductEdit('+idx+',\''+dim+'\',this.value)"></td>';
+    const numCell = dim => { const v = pcAllWeekDim(s, dim); const col = isAdd(dim)?'var(--success-dark)':'var(--danger)'; return '<td style="font-weight:600;color:'+col+'">'+(v||0)+'</td>'; };
+    const total = pcAllWeekTotal(s);
     tr.innerHTML = `
       <td>
         <span class="st-avatar-sm" style="background:${avatarColor}">${s.name[0]}</span>
@@ -2491,31 +2505,35 @@ function initConductTable() {
       ${numCell('d1')}${numCell('d2')}${numCell('d3')}${numCell('d4')}${numCell('d5')}
       ${numCell('d6')}${numCell('d7')}${numCell('d8')}${numCell('d9')}
       ${numCell('d10')}${numCell('d11')}${numCell('d12')}
-      <td id="tot-${idx}" style="font-weight:700;color:${netConductTotal(s)>0?'var(--success-dark)':netConductTotal(s)<0?'var(--danger)':'var(--text-2)'}">${netConductTotal(s)}</td>
+      <td style="font-weight:700;color:${total>0?'var(--success-dark)':total<0?'var(--danger)':'var(--text-2)'}">${total}</td>
       <td style="font-size:12px;color:var(--text-3)">${PcConductNotesHtml(s)}</td>
-      <td id="rk-${idx}"><span class="tag ${rankMap[s.id]<=3?'tag-green':rankMap[s.id]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.id]}名</span></td>
+      <td><span class="tag ${rankMap[s.id]<=3?'tag-green':rankMap[s.id]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.id]}名</span></td>
     `;
     tbody.appendChild(tr);
   });
 
-  // Calc averages
-  const avg = key => (students.reduce((sum, s) => sum + (s.conduct[key]||0), 0) / students.length).toFixed(1);
+  // Calc averages (各维度的周次合计均值)
   ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'].forEach(k => {
     const el = document.getElementById('avg-'+k);
-    if (el) el.textContent = avg(k);
+    if (el) el.textContent = (students.reduce((sum, s) => sum + pcAllWeekDim(s, k), 0) / students.length).toFixed(1);
   });
   const tel = document.getElementById('avg-total');
-  if (tel) tel.textContent = (students.reduce((sum, s) => sum + netConductTotal(s), 0) / students.length).toFixed(1);
+  if (tel) tel.textContent = (students.reduce((sum, s) => sum + pcAllWeekTotal(s), 0) / students.length).toFixed(1);
 }
 
 // ========== 品德操行表格 按周切换（方案1） ==========
 // 加分维度与减分维度（用于按周总分 = 100 + 加分合计 - 减分合计）
 var CONDUCT_ADD_DIMS = ['d1','d2','d3','d4','d5','d10'];
 var CONDUCT_ALL_DIMS = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
+// 渲染当前所选周次对应视图：选了周→该周可编辑表格；未选周(全部)→只读累计合计
+function renderCurrentConductView() {
+  var wk = currentConductWeek();
+  if (wk) { if (typeof renderConductWeekTable==='function') renderConductWeekTable(String(wk)); }
+  else { initConductTable(); }
+}
 function onConductWeekChange(sel) {
   var w = sel.value;
-  if (!w) { initConductTable(); }
-  else { renderConductWeekTable(String(w)); }
+  renderCurrentConductView();
   // 同步看板页周次选择器
   try { var ksel = document.getElementById('kanbanWeekSelect'); if (ksel) ksel.value = sel.value; } catch(e){}
   // 若正处于看板视图，周次联动刷新看板（学生卡片/宿舍热力/扣分图）
@@ -2612,7 +2630,7 @@ function PcConductWeekEdit(fid, dim, el) {
 function initKanbanStudentCards() {
   const grid = document.getElementById('kanbanStudentCards');
   grid.innerHTML = '';
-  students.slice(0, 12).forEach(s => {
+  students.forEach(s => {
     // 看板总分与表格模式“总分”列一致（选周看板随周联动）；维度条也取所选周数值
     const score = pcWeekTotal(s, currentConductWeek());
     const _wk = currentConductWeek();
