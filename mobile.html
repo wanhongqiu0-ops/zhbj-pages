@@ -1386,7 +1386,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <!-- Week selector -->
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="font-size:13px;color:var(--text-2)">周次</span>
-          <select class="form-select" id="mConductWeekSelect" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;"></select>
+          <select class="form-select" id="mConductWeekSelect" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;" onchange="mOnConductWeekChange()"></select>
           <script>try{var _ws=document.getElementById('mConductWeekSelect');if(_ws){var _cw=(typeof cwWeekOfYearM==='function'?cwWeekOfYearM(new Date()):1);var _hh='';for(var _w=1;_w<=21;_w++){_hh+='<option value="'+_w+'">第'+_w+'周'+(_w===_cw?'（本周）':'')+'</option>';}_ws.innerHTML=_hh;}}catch(e){}</script>
         </div>
 
@@ -2260,6 +2260,52 @@ function mConductNet(s) {
   return (s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10) -
          (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11 + s.conduct.d12);
 }
+// ===== 云端操行记录（保留原始行便于按周取数）+ 按周模板快照（与 PC 端共享）=====
+var _mCloudConductRows = [];
+var _mWeekTpl = null;
+var MC_ADD = ['d1','d2','d3','d4','d5','d10'];
+var MC_ALL = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
+function mWeekTpl(){ try { if (!_mWeekTpl) _mWeekTpl = JSON.parse(localStorage.getItem('smartclass_conduct_weektpl')||'null') || {}; } catch(e){ _mWeekTpl = {}; } return _mWeekTpl; }
+function mSaveWeekTpl(){ try { localStorage.setItem('smartclass_conduct_weektpl', JSON.stringify(_mWeekTpl)); } catch(e){} }
+function mCurrentWeek(){ var s = document.getElementById('mConductWeekSelect'); return (s && s.value) ? s.value : ''; }
+function mMergeToWeekTplFromCloud(arr){ try { var obj = JSON.parse(arr||'{}'); if(!obj || typeof obj!=='object') return; var cur = mWeekTpl(); Object.keys(obj).forEach(function(w){ cur[w] = obj[w]; }); _mWeekTpl = cur; mSaveWeekTpl(); } catch(e){} }
+function pullMWeekTplCloud(){
+  if (typeof sbEnabled !== 'function' || !sbEnabled() || typeof sbFetchWhere !== 'function') return;
+  sbFetchWhere('class_settings', 'key=eq.conductWeekTpl', function(rows){ try { if (rows && rows.length && rows[0].value) mMergeToWeekTplFromCloud(rows[0].value); } catch(e){} });
+}
+function pushMWeekTplCloud(){
+  if (typeof sbEnabled !== 'function' || !sbEnabled() || typeof sbUpsert !== 'function') return;
+  mSaveWeekTpl();
+  try { var p = mWeekTpl(); if (Object.keys(p).length) sbUpsert('class_settings', { key: 'conductWeekTpl', value: JSON.stringify(p) }, 'key'); } catch(e){}
+}
+// 该学生某周总分：选周时按“当周收集记录 + 该周模板快照”汇总；未选周(累计)时用累计净汇总
+function mWeekTotal(s, wk){
+  if (!wk) return mConductNet(s);
+  var cm = mWeekMatrix(String(wk))[s.fullId] || {};
+  var sn = (mWeekTpl()[String(wk)] || {})[s.fullId];
+  var snDims = (sn && sn.dims) ? sn.dims : null;
+  var add = 0, ded = 0;
+  MC_ALL.forEach(function(k){
+    var val = (snDims && snDims[k] !== undefined) ? snDims[k] : (cm[k] || 0);
+    if (MC_ADD.indexOf(k) >= 0) add += val; else ded += val;
+  });
+  return add - ded;
+}
+// 某学生某周某个维度的数值：选周时取“该周模板快照优先，否则当周收集记录”；未选周(累计)取累计 s.conduct[k]
+function mWeekDimVal(s, wk, k) {
+  if (!wk) return (s.conduct[k] || 0);
+  var cm = mWeekMatrix(String(wk))[s.fullId] || {};
+  var sn = (mWeekTpl()[String(wk)] || {})[s.fullId];
+  var v = (sn && sn.dims && sn.dims[k] !== undefined) ? sn.dims[k] : cm[k];
+  return v || 0;
+}
+function mWeekMatrix(wk){
+  var m = {};
+  function add(fid, dm, sc){ var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (sc || 0); }
+  try { var recs = JSON.parse(localStorage.getItem('smartclass_conduct_collect')||'[]') || []; recs.forEach(function(r){ if (r && String(r.week) === String(wk) && r.fullId && r.dim) add(r.fullId, r.dim, r.score); }); } catch(e){}
+  (_mCloudConductRows || []).forEach(function(r){ if (r && String(r.week) === String(wk) && r.full_id && r.dim) add(r.full_id, r.dim, r.score); });
+  return m;
+}
 
 // ================== Supabase 云端同步层（真正跨设备数据回传）==================
 // 配置存于 localStorage，由 PC 端“数据同步配置”入口写入，手机端读取同一配置。
@@ -2312,6 +2358,7 @@ function restoreCollectCount() { try { localStorage.removeItem(COLLECT_CLEAR_KEY
 function applyCloudRecords() {
   if (!sbEnabled()) return;
   sbFetch('conduct_records', function(rows) {
+    _mCloudConductRows = rows || [];
     _clConduct = (rows||[]).length;
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
@@ -3095,8 +3142,9 @@ function resetAttendance() {
 function initConductCards() {
   const list = document.getElementById('conductCardList');
   list.innerHTML = '';
+  const _wk = mCurrentWeek();
   students.slice(0, 15).forEach(s => {
-    const score = mConductNet(s);
+    const score = mWeekTotal(s, _wk);
     const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
     card.className = 'conduct-card-item';
@@ -3112,7 +3160,7 @@ function initConductCards() {
       <div class="cci-dims">
         ${[['d1','黑板报','add'],['d2','好人好事','add'],['d4','班干部','add'],['d6','班级卫生','sub'],['d7','宿舍/手机','sub'],['d8','晚修纪律','sub'],['d9','课堂/作业','sub'],['d11','出勤/仪容','sub']].map(function(d){
           var key=d[0], lab=d[1], pos=(d[2]==='add');
-          var v=s.conduct[key]||0;
+          var v=mWeekDimVal(s,_wk,key);
           return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><input id="cdIn_'+s.fullId+'_'+key+'" type="number" class="cd-input" value="'+v+'" min="0" style="'+(pos?'color:var(--success-dark);':'color:var(--danger);')+'" oninput="mAdjustConduct(\''+s.fullId+'\',\''+key+'\',this)"></div>';
         }).join('')}
         <div class="cci-dim"><span class="cd-label">总分</span><span id="cdScoreDim_${s.fullId}" class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
@@ -3136,6 +3184,23 @@ function mAdjustConduct(fid, key, el) {
   if (!s) return;
   var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
   if (isNaN(v)) v = 0;
+  var _wk = mCurrentWeek();
+  if (_wk) {
+    // 选周时：写入该周模板快照（不污染累计），并同步云端与PC端共用
+    var tpl = mWeekTpl();
+    var wp = tpl[String(_wk)] || (tpl[String(_wk)] = {});
+    var sn = wp[s.fullId] || (wp[s.fullId] = { dims: {} });
+    sn.dims[key] = Math.abs(v);
+    mSaveWeekTpl();
+    try { if (typeof pushMWeekTplCloud === 'function') pushMWeekTplCloud(); } catch(e){}
+    var score = mWeekTotal(s, String(_wk));
+    var sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
+    var top = document.getElementById('cdScoreTop_' + fid);
+    var dime = document.getElementById('cdScoreDim_' + fid);
+    if (top) { top.textContent = score; top.className = 'cci-score ' + sc; }
+    if (dime) { dime.textContent = score; dime.style.color = score > 0 ? 'var(--success-dark)' : score < 0 ? 'var(--danger)' : 'var(--text-2)'; }
+    return;
+  }
   s.conduct[key] = Math.abs(v); // 加分/减分均按数值存，正负由维度类型决定
   var score = mConductNet(s);
   var sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
@@ -3160,6 +3225,13 @@ function switchConductMode(mode) {
     setTimeout(initMCharts, 100);
   }
 }
+// 切换周次：按当前所处视图（表格/看板）重新渲染，让数据随所选周联动
+function mOnConductWeekChange() {
+  try {
+    var kanbanVisible = document.getElementById('conductKanbanMode') && document.getElementById('conductKanbanMode').style.display !== 'none';
+    if (kanbanVisible) initMCharts(); else initConductCards();
+  } catch(e) {}
+}
 
 let mDeductChartInstance = null;
 function initMCharts() {
@@ -3169,12 +3241,13 @@ function initMCharts() {
   if (mDeductChartInstance) mDeductChartInstance.dispose();
   mDeductChartInstance = echarts.init(chartDom);
   const dims = ['班级卫生','宿舍/手机','晚修纪律','课堂/作业','出勤/仪容'];
+  const _wkd = mCurrentWeek();
   const data = [
-    students.reduce((s,st)=>s+st.conduct.d6,0),
-    students.reduce((s,st)=>s+st.conduct.d7,0),
-    students.reduce((s,st)=>s+st.conduct.d8,0),
-    students.reduce((s,st)=>s+st.conduct.d9,0),
-    students.reduce((s,st)=>s+st.conduct.d11,0),
+    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d6'),0),
+    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d7'),0),
+    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d8'),0),
+    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d9'),0),
+    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d11'),0),
   ];
   mDeductChartInstance.setOption({
     tooltip: { trigger: 'axis', formatter: '{b}: 扣{c}分' },
@@ -3191,7 +3264,8 @@ function initMCharts() {
   // Heatmap
   const hg = document.getElementById('mHeatGrid');
   hg.innerHTML = '';
-  // 宿舍按“宿舍号前3位数字”分组（如 504-3 → 504），卡片分数=该宿舍学生总分的和
+  // 宿舍按“宿舍号前3位数字”分组（如 504-3 → 504），卡片分数=该宿舍学生总分之和；看板随所选周联动
+  const _mwk = mCurrentWeek();
   const dorms = {};
   students.forEach(s => {
     const m = String(s.dorm || '').trim().match(/^(\d+)/);
@@ -3200,7 +3274,7 @@ function initMCharts() {
     dorms[key].members.push(s);
   });
   Object.values(dorms).forEach(d => {
-    const total = d.members.reduce(function(acc, s){ return acc + (typeof mConductNet === 'function' ? (mConductNet(s)||0) : 0); }, 0);
+    const total = d.members.reduce(function(acc, s){ return acc + (typeof mWeekTotal === 'function' ? (mWeekTotal(s, _mwk)||0) : 0); }, 0);
     const card = document.createElement('div');
     card.className = 'heat-card';
     card.innerHTML = `<div class="hc-title">宿舍 ${d.name}</div><div class="hc-score">${Number(total).toFixed(1)}</div><div class="hc-detail">${d.members.length}人 · 总分 ${Number(total).toFixed(1)}</div>`;
@@ -4040,6 +4114,10 @@ function mApplyConductTemplate(rows) {
     if (hr >= 0) break;
   }
   if (hr < 0 || nameC < 0) return 0;
+  // 记录当前所选周：选周时数据只归档为该校周模板快照（不污染累计总表），本地+云端共享；未选周才写累计 s.conduct
+  var wkSel = mCurrentWeek();
+  var useWeek = !!(wkSel && String(wkSel).trim() !== '');
+  var snap = {};
   var applied = 0;
   for (var i = hr + 1; i < rows.length; i++) {
     var R = rows[i] || [];
@@ -4047,19 +4125,31 @@ function mApplyConductTemplate(rows) {
     if (!nm) continue;
     var s = students.find(function(x){ return x.name === nm; });
     if (!s) continue;
+    var sd = snap[s.fullId] || (snap[s.fullId] = { dims: {} });
     Object.keys(colMap).forEach(function(c){
       var v = parseFloat(String(R[c]).replace(/[^\d.\-]/g, ''));
       if (isNaN(v)) v = 0;
-      s.conduct[colMap[c]] = v;
+      v = Math.abs(v);
+      sd.dims[colMap[c]] = v;
+      if (!useWeek) s.conduct[colMap[c]] = v; // 仅“未选周”写入累计总表
     });
-    s.conduct.total = mConductNet(s);
+    if (!useWeek) s.conduct.total = mConductNet(s);
     applied++;
   }
-  // 仅当上传过名单(有持久化)时才回写，避免污染内置演示数据
-  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){}
+  // 选周时：归档为该周模板快照，保证该周表格/看板/刷新后仍显示，并同步到云端供 PC 端共用
+  if (useWeek && Object.keys(snap).length) {
+    var tpl = mWeekTpl();
+    tpl[wkSel] = snap;
+    mSaveWeekTpl();
+    try { if (typeof pushMWeekTplCloud === 'function') pushMWeekTplCloud(); } catch(e){}
+  }
+  // 仅当上传过名单(有持久化)且未选周时才回写累计，避免污染内置演示数据
+  if (!useWeek) { try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){} }
   if (typeof initConductCards === 'function') initConductCards();
   if (typeof renderMConductWeekView === 'function') renderMConductWeekView();
   if (typeof initMStudentTable === 'function') initMStudentTable();
+  // 若当前正好选中某周，刷新该周表格视图显示导入数据
+  if (useWeek && typeof mRenderConductWeekList === 'function') { try { mRenderConductWeekList(); } catch(e){} }
   return applied;
 }
 function showShareModal() {
