@@ -3834,6 +3834,29 @@ function showRosterUploadSheet() {
 // ===== 班级名单上传：解析 Excel/CSV 并替换 students，同步到考勤/学生档案，跨刷新保留 =====
 var ROSTER_KEY = 'smartclass_roster_students';
 function saveRosterStudents(arr) { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(arr)); } catch(e){} }
+// 名单云端同步：上传写云端、启动拉云端，PC/手机两端用同一份名单
+function pushRosterCloud() {
+  if (!sbEnabled || !sbEnabled() || typeof sbUpsert !== 'function') return;
+  try { sbUpsert('class_settings', { key: 'roster', value: JSON.stringify(students) }, 'key'); } catch(e) {}
+}
+function pullRosterFromCloud() {
+  if (!sbEnabled || !sbEnabled() || typeof sbFetchWhere !== 'function') return;
+  sbFetchWhere('class_settings', 'key=eq.roster', function(rows) {
+    try {
+      if (!rows || !rows.length) return;
+      var arr = JSON.parse(rows[0].value || '[]');
+      if (!Array.isArray(arr) || !arr.length) return;
+      students.length = 0; arr.forEach(function(s){ students.push(s); });
+      saveRosterStudents(students);
+      try {
+        if (typeof initMAttendance === 'function') initMAttendance();
+        if (typeof initMStudentTable === 'function') initMStudentTable('home');
+        if (typeof initConductCards === 'function') initConductCards('home');
+        if (typeof mRenderDuty === 'function') mRenderDuty('home');
+      } catch(e) { console.error('rosterRerenderM', e); }
+    } catch(e) { console.error('pullRosterM', e); }
+  });
+}
 function loadRosterStudents() {
   try {
     var raw = localStorage.getItem(ROSTER_KEY);
@@ -3928,6 +3951,7 @@ function handleMRosterUpload(input) {
       students.length = 0;
       parsed.forEach(function(s){ students.push(s); });
       saveRosterStudents(students);
+      try { pushRosterCloud(); } catch(e) { console.error('pushRosterCloud', e); }
       // 同步班级人数（未填时自动填，已填则不覆盖）
       var ci = loadMClassInfo();
       var cntEl = document.getElementById('csCount');
@@ -4289,6 +4313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { if (typeof window[fn]==='function') window[fn]('home'); } catch(e) { console.error(fn, e); }
   });
   wireTodoBottom();
+  try { pullRosterFromCloud(); } catch(e) { console.error('pullRosterFromCloud(DCL)', e); }
   try { renderMLeaves(); } catch(e) { console.error('renderMLeaves(DCL)', e); }
   try { syncMLeavesFromCloud(); } catch(e) { console.error('syncMLeavesFromCloud(DCL)', e); }
   setTimeout(function() {
