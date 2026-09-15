@@ -837,10 +837,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 560px; mar
         <div class="conduct-toolbar">
           <div class="week-selector">
             <span style="font-size:13px;color:var(--text-2)">周次：</span>
-            <select class="form-select" style="width:120px">
-              <option>第8周（本周）</option>
-              <option>第7周</option>
-            </select>
+            <select class="form-select" style="width:120px" id="kanbanWeekSelect" onchange="onKanbanWeekChange(this)"></select>
           </div>
         </div>
 
@@ -2032,8 +2029,19 @@ function populateConductWeekSelect() {
   for (var w = 1; w <= 21; w++) weeks[String(w)] = true;
   collectWeekList().forEach(function(ww){ weeks[String(ww)] = true; });
   var opts = Object.keys(weeks).sort(function(a,b){ return (Number(a)||0) - (Number(b)||0); }).map(function(w){ return '<option value="'+w+'">第'+w+'周</option>'; }).join('');
-  sel.innerHTML = '<option value="">全部（累计）</option>' + opts;
+  var html = '<option value="">全部（累计）</option>' + opts;
+  sel.innerHTML = html;
   if (cur !== '' && weeks[cur] !== undefined) sel.value = cur; else sel.value = '';
+  // 看板页周次选择器同步（同一周次源）
+  var ksel = document.getElementById('kanbanWeekSelect');
+  if (ksel) { var kcur = ksel.value; ksel.innerHTML = html; if (kcur !== '' && weeks[kcur] !== undefined) ksel.value = kcur; else ksel.value = sel.value; }
+}
+// 看板页周次选择：同步表格页选择器并刷新看板/表格按周数据
+function onKanbanWeekChange(sel) {
+  var ts = document.getElementById('conductWeekSelect');
+  if (ts) ts.value = sel.value;
+  try { if (sel.value) renderConductWeekTable(String(sel.value)); else initConductTable(); } catch(e){}
+  try { if (typeof initKanbanCharts==='function') initKanbanCharts(); } catch(e){}
 }
 // 按周聚合收集记录：返回 { fullId: { dim: 该周累计分 } }
 function buildWeeklyMatrix(weekStr) {
@@ -2508,6 +2516,8 @@ function onConductWeekChange(sel) {
   var w = sel.value;
   if (!w) { initConductTable(); }
   else { renderConductWeekTable(String(w)); }
+  // 同步看板页周次选择器
+  try { var ksel = document.getElementById('kanbanWeekSelect'); if (ksel) ksel.value = sel.value; } catch(e){}
   // 若正处于看板视图，周次联动刷新看板（学生卡片/宿舍热力/扣分图）
   try {
     var kb = document.getElementById('page-conduct-kanban');
@@ -2520,8 +2530,6 @@ function renderConductWeekTable(weekStr) {
   if (!tbody) return;
   var m = buildWeeklyMatrix(weekStr);
   var isAdd = function(k){ return CONDUCT_ADD_DIMS.indexOf(k) !== -1; };
-  var addCls = v => v>0?'cell-add':'cell-zero';
-  var dedCls = v => v>0?'cell-deduct':'cell-zero';
   var snWeek = loadWeekTpl()[String(weekStr)] || {};
 
   // 计算该周每个学生的周总分 = 当周维度汇总（加分合计 - 减分合计），合并该周模板快照
@@ -2547,14 +2555,14 @@ function renderConductWeekTable(weekStr) {
     var v = function(k){ return cm[k] || 0; };
     var total = weekTotalMap[s.fullId];
     var tr = document.createElement('tr');
-    var cell = function(k, clsFn){ var val = v(k); var sgn = val>0 ? (isAdd(k)?'+':'-') : ''; return '<td><span class="cell-score '+clsFn(val)+'">'+sgn+val+'</span></td>'; };
+    var cellInput = function(k){ var val = v(k); var col = isAdd(k) ? 'var(--success-dark)' : 'var(--danger)'; return '<td><input type="number" class="cell-input" min="0" value="'+val+'" data-wk="' + weekStr + '" style="color:'+col+'" oninput="PcConductWeekEdit(\''+s.fullId+'\',\''+k+'\',this)"></td>'; };
     tr.innerHTML = `
       <td><span class="st-avatar-sm" style="background:${s.color}">${s.name[0]}</span> <span style="font-size:12px;color:var(--text-3)">${s.id}</span> ${s.name}</td>
       <td style="font-size:12px">${s.dorm}</td>
-      ${CONDUCT_ALL_DIMS.map(k => cell(k, isAdd(k)?addCls:dedCls)).join('')}
-      <td style="font-weight:700;color:${total>=95?'var(--success-dark)':total>=85?'var(--orange)':'var(--danger)'}">${total}</td>
+      ${CONDUCT_ALL_DIMS.map(k => cellInput(k)).join('')}
+      <td style="font-weight:700;color:${total>=95?'var(--success-dark)':total>=85?'var(--orange)':'var(--danger)'}" id="wtot-${s.fullId}">${total}</td>
       <td style="font-size:12px;color:var(--text-3)">${s.conduct.note||'—'}</td>
-      <td><span class="tag ${rankMap[s.fullId]<=3?'tag-green':rankMap[s.fullId]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.fullId]}名</span></td>
+      <td id="wrk-${s.fullId}"><span class="tag ${rankMap[s.fullId]<=3?'tag-green':rankMap[s.fullId]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.fullId]}名</span></td>
     `;
     tbody.appendChild(tr);
   });
@@ -2564,6 +2572,40 @@ function renderConductWeekTable(weekStr) {
   CONDUCT_ALL_DIMS.forEach(function(k){ var el=document.getElementById('avg-'+k); if(el) el.textContent = avg(k); });
   var tavgEl = document.getElementById('avg-total');
   if (tavgEl) tavgEl.textContent = (students.reduce(function(sum,s){ return sum + weekTotalMap[s.fullId]; }, 0) / students.length).toFixed(1);
+}
+// 某周表格录入：把值写回该周模板快照（不写累计），实时刷新该行总分/排名与列平均，并持久化到云端供两端共享
+function PcConductWeekEdit(fid, dim, el) {
+  var week = currentConductWeek();
+  if (!week) {
+    var idx = students.findIndex(function(x){ return x.fullId === fid; });
+    if (idx >= 0 && typeof PcConductEdit==='function') PcConductEdit(idx, dim, el ? el.value : '');
+    return;
+  }
+  var s = students.find(function(x){ return x.fullId === fid; });
+  if (!s) return;
+  var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
+  if (isNaN(v)) v = 0; v = Math.abs(v);
+  var tpl = loadWeekTpl();
+  var wk = tpl[String(week)] || (tpl[String(week)] = {});
+  var sn = wk[fid] || (wk[fid] = { dims: {} });
+  sn.dims[dim] = v;
+  saveWeekTpl(tpl);
+  try { if (typeof pushWeekTplCloud==='function') pushWeekTplCloud(); } catch(e){}
+  var wkS = String(week);
+  var total = pcWeekTotal(s, wkS);
+  var totEl = document.getElementById('wtot-' + fid);
+  if (totEl) totEl.textContent = total;
+  var sorted = [...students].sort(function(a,b){ return pcWeekTotal(b, wkS) - pcWeekTotal(a, wkS); });
+  var rankMap = {}; sorted.forEach(function(x,i){ rankMap[x.fullId] = i + 1; });
+  var r = rankMap[fid] || students.length;
+  var rkEl = document.getElementById('wrk-' + fid);
+  if (rkEl) rkEl.innerHTML = '<span class="tag '+(r<=3?'tag-green':r<=10?'tag-blue':'tag-gray')+'">第'+r+'名</span>';
+  CONDUCT_ALL_DIMS.forEach(function(k){
+    var aEl = document.getElementById('avg-'+k);
+    if (aEl) { var sum = students.reduce(function(a,x){ return a + pcWeekDimVal(x, wkS, k); }, 0); aEl.textContent = (sum/students.length).toFixed(1); }
+  });
+  var tel = document.getElementById('avg-total');
+  if (tel) tel.textContent = (students.reduce(function(a,x){ return a + pcWeekTotal(x, wkS); }, 0)/students.length).toFixed(1);
 }
 
 // ========== Conduct Kanban ==========
