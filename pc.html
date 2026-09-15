@@ -2513,8 +2513,9 @@ function initKanbanStudentCards() {
   const grid = document.getElementById('kanbanStudentCards');
   grid.innerHTML = '';
   students.slice(0, 12).forEach(s => {
-    const score = s.conduct.total;
-    const scoreClass = score >= 95 ? 'good' : score >= 85 ? 'warn' : 'bad';
+    // 看板总分与表格模式“总分”列一致（净汇总 = 加分合计 - 减分合计，不叠加100分制基准）
+    const score = netConductTotal(s);
+    const scoreClass = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
     card.className = 'student-card';
     card.onclick = () => showStudentDetail(s);
@@ -2640,7 +2641,7 @@ function showStudentDetail(s) {
   document.getElementById('sdmAvatar').style.background = s.color;
   document.getElementById('sdmName').textContent = s.name;
   document.getElementById('sdmId').textContent = s.fullId;
-  document.getElementById('sdmScore').textContent = s.conduct.total;
+  document.getElementById('sdmScore').textContent = netConductTotal(s);
   renderStudentScores(s);
 
   showModal('studentDetailModal');
@@ -4057,6 +4058,8 @@ function applyConductTemplate(rows) {
     applied++;
   }
   try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(_){}
+  // 同步名单（含导入的操行数据）到云端，保证刷新/换设备后不丢失（PC端启动时云端名单会覆盖本地，必须回写云端才算真正“保存”）
+  try { if (typeof pushRosterCloud === 'function') pushRosterCloud(); } catch(_){}
   if (typeof initConductTable === 'function') initConductTable();
   if (typeof initStudentTable === 'function') initStudentTable();
   if (typeof initConductCards === 'function') initConductCards();

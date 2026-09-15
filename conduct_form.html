@@ -42,6 +42,11 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .fpv-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .fpv-score-row { display: flex; align-items: center; gap: 8px; }
 .fpv-score-row input { text-align: center; font-weight: 700; max-width: 80px; }
+.fpv-check-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 10px; background: #fff; }
+.fpv-check { display: flex; align-items: center; gap: 8px; padding: 7px 2px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border-light); }
+.fpv-check:last-child { border-bottom: none; }
+.fpv-check input { width: 17px; height: 17px; accent-color: var(--primary); flex-shrink: 0; }
+.fpv-check .fpv-check-count { margin-left: auto; color: var(--text-3); font-size: 11px; }
 .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; font-size: 13px; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; border: 1px solid var(--border); background: #fff; color: var(--text-1); }
 .btn:hover { border-color: var(--primary); color: var(--primary); }
 .btn-sm { padding: 6px 10px; font-size: 12px; }
@@ -203,7 +208,7 @@ function loadCloudRoster() {
       replayCollectRecords();
       replayCloudRecords();
       // 若表单已渲染则刷新，确保下拉立即显示新名单
-      if (document.getElementById('formView') && document.getElementById('fpvStudent')) renderForm();
+      if (document.getElementById('formView') && document.getElementById('fpvStudentList')) renderForm();
     } catch(e){ console.error('loadCloudRoster', e); }
   }).catch(function(){});
 }
@@ -269,8 +274,8 @@ function renderForm() {
     return '<option value="' + w + '">第' + w + '周' + (w === curW ? '（本周）' : '') + '</option>';
   }).join('');
 
-  var studentOptions = '<option value="">请选择学生...</option>' + students.map(function(s, i) {
-    return '<option value="' + i + '">' + s.name + ' (' + s.fullId + ')</option>';
+  var studentOptions = students.map(function(s, i) {
+    return '<label class="fpv-check"><input type="checkbox" value="' + i + '"><span>' + s.name + '</span><span class="fpv-check-count">' + s.fullId + '</span></label>';
   }).join('');
 
   var typeHtml = typeOptions.map(function(t, i) {
@@ -280,7 +285,7 @@ function renderForm() {
   container.innerHTML =
     '<div class="fpv-header"><h2>📊 品德操行数据收集表</h2><p>班干部填写操行数据，提交后按周汇总至操行表格记录</p></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>0. 选择所属周次</label><select id="fpvWeek">' + weekOptions + '</select><div style="font-size:11px;color:var(--text-3);margin-top:4px">提交的数据会计入所选周的操行表格记录，默认本周</div></div>' +
-    '<div class="fpv-section"><label><span class="req">*</span>1. 选择学生</label><select id="fpvStudent">' + studentOptions + '</select></div>' +
+    '<div class="fpv-section"><label><span class="req">*</span>1. 选择学生（可多选）</label><div id="fpvStudentList" class="fpv-check-list">' + studentOptions + '</div><div style="font-size:11px;color:var(--text-3);margin-top:4px">可勾选一名或多名学生，提交时按所选维度与分值批量录入</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>2. 选择录入维度</label><div class="fpv-types" id="fpvTypes">' + typeHtml + '</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>3. 填写数据</label><textarea id="fpvDesc" rows="3" placeholder="描述具体情况，如：制作黑板报获一等奖..."></textarea></div>' +
     '<div class="fpv-section"><label>分值</label><div class="fpv-score-row"><button class="btn btn-sm" onclick="adjustScore(-1)">−</button><input type="text" id="fpvScore" value="1" readonly><button class="btn btn-sm" onclick="adjustScore(1)">+</button><span id="fpvScoreType" style="font-size:12px;color:var(--text-3);margin-left:4px">分</span></div></div>' +
@@ -328,49 +333,59 @@ function previewPhoto(input) {
 }
 
 function submitForm() {
-  var studentIdx = document.getElementById('fpvStudent').value;
-  if (!studentIdx && studentIdx !== '0') { showToast('请选择学生'); return; }
   if (!fpvSelectedType) { showToast('请选择录入维度'); return; }
-  var s = students[parseInt(studentIdx)];
+  // 读取勾选的学生（可多选）
+  var chks = document.querySelectorAll('#fpvStudentList input[type=checkbox]:checked');
+  var idxs = [];
+  chks.forEach(function(el){ idxs.push(parseInt(el.value, 10)); });
+  if (!idxs.length) { showToast('请至少选择一名学生'); return; }
   var desc = document.getElementById('fpvDesc').value.trim() || '未填写描述';
   var weekEl = document.getElementById('fpvWeek');
   if (fpvWeek === null) fpvWeek = collectWeekFromUrl() || currentCollectWeek();
   var week = weekEl && weekEl.value ? weekEl.value : String(fpvWeek);
 
   var dim = fpvSelectedType.dim;
-  s.conduct[dim] += fpvScore;
-  if (fpvSelectedType.scoreType === '加分') s.conduct.total += fpvScore;
-  else s.conduct.total -= fpvScore;
-
-  // 保存提交记录到共享存储（localStorage），触发PC/手机原型storage事件同步
   var records = loadCollectRecords();
-  records.push({
-    fullId: s.fullId,
-    dim: dim,
-    score: fpvScore,
-    scoreType: fpvSelectedType.scoreType,
-    desc: desc,
-    photo: fpvPhotoData,
-    week: String(week),
-    ts: new Date().toISOString()
+  var names = [];
+
+  idxs.forEach(function(idx) {
+    var s = students[idx];
+    if (!s) return;
+    s.conduct[dim] += fpvScore;
+    if (fpvSelectedType.scoreType === '加分') s.conduct.total += fpvScore;
+    else s.conduct.total -= fpvScore;
+
+    // 保存提交记录到共享存储（localStorage），触发PC/手机原型storage事件同步
+    records.push({
+      fullId: s.fullId,
+      dim: dim,
+      score: fpvScore,
+      scoreType: fpvSelectedType.scoreType,
+      desc: desc,
+      photo: fpvPhotoData,
+      week: String(week),
+      ts: new Date().toISOString()
+    });
+    names.push(s.name);
+    // 若配置了 Supabase，则写入云端数据库（真正跨设备回传）
+    if (sbEnabled()) {
+      sbInsert('conduct_records', {
+        full_id: s.fullId, name: s.name, dim: dim,
+        score: fpvScore, score_type: fpvSelectedType.scoreType,
+        description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
+        week: String(week),
+        device: (navigator.userAgent || '').substring(0, 40)
+      });
+    }
   });
+
   saveCollectRecords(records);
   // 通知同源打开的原型有新数据
   try { window.dispatchEvent(new StorageEvent('storage', { key: COLLECT_STORAGE_KEY, newValue: JSON.stringify(records) })); } catch(e){}
-  // 若配置了 Supabase，则写入云端数据库（真正跨设备回传）
-  if (sbEnabled()) {
-    sbInsert('conduct_records', {
-      full_id: s.fullId, name: s.name, dim: dim,
-      score: fpvScore, score_type: fpvSelectedType.scoreType,
-      description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
-      week: String(week),
-      device: (navigator.userAgent || '').substring(0, 40)
-    });
-  }
 
   var container = document.getElementById('formView');
   container.innerHTML =
-    '<div class="fpv-success"><div class="icon">✅</div><h3>提交成功！</h3><p>' + s.name + ' 的' + (dimNames[dim]||'') + '数据已记录' + (sbEnabled() ? '并上传云端' : '并同步至PC端/手机端原型') + '</p>' +
+    '<div class="fpv-success"><div class="icon">✅</div><h3>提交成功！</h3><p>' + names.join('、') + ' 的' + (dimNames[dim]||'') + '数据已记录' + (sbEnabled() ? '并上传云端' : '并同步至PC端/手机端原型') + '</p>' +
     '<p style="margin-top:16px"><button class="fpv-submit" style="margin-top:16px" onclick="renderForm()">继续填写</button></p></div>';
 }
 
