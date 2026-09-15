@@ -1386,11 +1386,8 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <!-- Week selector -->
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="font-size:13px;color:var(--text-2)">周次</span>
-          <select class="form-select" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;">
-            <option>第8周（本周）</option>
-            <option>第7周</option>
-            <option>第6周</option>
-          </select>
+          <select class="form-select" id="mConductWeekSelect" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;"></select>
+          <script>try{var _ws=document.getElementById('mConductWeekSelect');if(_ws){var _cw=(typeof cwWeekOfYearM==='function'?cwWeekOfYearM(new Date()):1);var _hh='';for(var _w=1;_w<=21;_w++){_hh+='<option value="'+_w+'">第'+_w+'周'+(_w===_cw?'（本周）':'')+'</option>';}_ws.innerHTML=_hh;}}catch(e){}</script>
         </div>
 
         <!-- Table Mode -->
@@ -3194,14 +3191,19 @@ function initMCharts() {
   // Heatmap
   const hg = document.getElementById('mHeatGrid');
   hg.innerHTML = '';
+  // 宿舍按“宿舍号前3位数字”分组（如 504-3 → 504），卡片分数=该宿舍学生总分的和
   const dorms = {};
-  students.forEach(s => { if(!dorms[s.dorm]) dorms[s.dorm] = { name:s.dorm, count:0, deduct:0 }; dorms[s.dorm].count++; dorms[s.dorm].deduct += s.conduct.d7; });
+  students.forEach(s => {
+    const m = String(s.dorm || '').trim().match(/^(\d+)/);
+    const key = m ? m[1] : (String(s.dorm || '').trim() || '其他');
+    if (!dorms[key]) dorms[key] = { name: key, members: [] };
+    dorms[key].members.push(s);
+  });
   Object.values(dorms).forEach(d => {
-    const avg = d.deduct / d.count;
-    const isAlert = avg > 1.5;
+    const total = d.members.reduce(function(acc, s){ return acc + (typeof mConductNet === 'function' ? (mConductNet(s)||0) : 0); }, 0);
     const card = document.createElement('div');
-    card.className = 'heat-card' + (isAlert?' alert':'');
-    card.innerHTML = `<div class="hc-title">宿舍 ${d.name}</div><div class="hc-score" style="color:${isAlert?'var(--danger)':'var(--success-dark)'}">${(10-avg).toFixed(1)}</div><div class="hc-detail">${d.count}人 · 均扣${avg.toFixed(1)}分</div>`;
+    card.className = 'heat-card';
+    card.innerHTML = `<div class="hc-title">宿舍 ${d.name}</div><div class="hc-score">${Number(total).toFixed(1)}</div><div class="hc-detail">${d.members.length}人 · 总分 ${Number(total).toFixed(1)}</div>`;
     hg.appendChild(card);
   });
 
@@ -4123,7 +4125,7 @@ function mExportAttendanceXlsx(date) {
 // 操行：选周次（导出当前学生维度表，文件名带周次）
 function mExportConductPick() {
   var wk = cwWeekOfYearM ? cwWeekOfYearM(new Date()) : 8;
-  var items = []; for (var w = 1; w <= 20; w++) items.push({ label: '第' + w + '周' + (w === wk ? '（本周）' : ''), value: w });
+  var items = []; for (var w = 1; w <= 21; w++) items.push({ label: '第' + w + '周' + (w === wk ? '（本周）' : ''), value: w });
   openExportPick('选择操行报表周次', items, function(week) { mExportConductXlsx(week); });
 }
 function mExportConductXlsx(week) {

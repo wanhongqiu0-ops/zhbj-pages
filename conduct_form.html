@@ -178,6 +178,36 @@ function replayCloudRecords() {
 }
 replayCloudRecords();
 
+// ========== 从云端同步班级名单（class_settings.key='roster'）==========
+// PC端/手机端上传的名单存于云端，收集表启动时拉取覆盖本地模拟学生，
+// 保证“选择学生”下拉显示的是已上传的真实名单姓名。
+function loadCloudRoster() {
+  var c = sbConfig();
+  if (!c.url || !c.anon || !sbEnabled()) return;
+  fetch(c.url + '/rest/v1/class_settings?select=value&key=eq.roster&limit=1', {
+    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    try {
+      if (!Array.isArray(d) || !d.length || !d[0].value) return;
+      var arr = JSON.parse(d[0].value || '[]');
+      if (!Array.isArray(arr) || !arr.length) return;
+      students.length = 0;
+      arr.forEach(function(s){ students.push(s); });
+      // 补齐 conduct 默认值，避免渲染/合计报错
+      var dimKeys = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
+      students.forEach(function(s){
+        if (!s.conduct) s.conduct = {};
+        dimKeys.forEach(function(k){ if (s.conduct[k] === undefined) s.conduct[k] = 0; });
+        if (s.conduct.total === undefined) s.conduct.total = 100;
+      });
+      replayCollectRecords();
+      replayCloudRecords();
+      // 若表单已渲染则刷新，确保下拉立即显示新名单
+      if (document.getElementById('formView') && document.getElementById('fpvStudent')) renderForm();
+    } catch(e){ console.error('loadCloudRoster', e); }
+  }).catch(function(){});
+}
+
 // ========== Toast ==========
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -201,18 +231,18 @@ function computeWeekOfYear(now) {
   var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
-// 集合收集表周次区间为 1~20（学期周次），默认周钳制在此范围内保证可下拉选择
+// 集合收集表周次区间为 1~21（学期周次），默认周钳制在此范围内保证可下拉选择
 function currentCollectWeek() {
   var w = computeWeekOfYear(new Date());
-  return w < 1 ? 1 : (w > 20 ? 20 : w);
+  return w < 1 ? 1 : (w > 21 ? 21 : w);
 }
-// 读取分发链接中的 ?week= 参数（若有则作为默认收集周），钳制到 1~20
+// 读取分发链接中的 ?week= 参数（若有则作为默认收集周），钳制到 1~21
 function collectWeekFromUrl() {
   try {
     var m = location.search.match(/[?&]week=([0-9]+)/i);
     if (m) {
       var w = parseInt(m[1], 10);
-      if (!isNaN(w) && w >= 1 && w <= 52) return Math.min(w, 20);
+      if (!isNaN(w) && w >= 1 && w <= 52) return Math.min(w, 21);
     }
   } catch(e){}
   return null;
@@ -232,9 +262,9 @@ function renderForm() {
   document.body.style.overflow = 'auto';
   var container = document.getElementById('formView');
 
-  // 周次下拉：第1~20周，默认当前周
+  // 周次下拉：第1~21周，默认当前周
   var curW = collectWeekFromUrl() || currentCollectWeek();
-  var weekOptions = Array.apply(null, { length: 20 }).map(function(_, i) {
+  var weekOptions = Array.apply(null, { length: 21 }).map(function(_, i) {
     var w = i + 1;
     return '<option value="' + w + '">第' + w + '周' + (w === curW ? '（本周）' : '') + '</option>';
   }).join('');
@@ -345,7 +375,7 @@ function submitForm() {
 }
 
 // Auto-render on load
-document.addEventListener('DOMContentLoaded', renderForm);
+document.addEventListener('DOMContentLoaded', function(){ renderForm(); loadCloudRoster(); });
 </script>
 </body>
 </html>

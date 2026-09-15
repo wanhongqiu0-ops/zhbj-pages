@@ -2023,14 +2023,17 @@ function collectWeekList() {
   (_cloudConductRows || []).forEach(function(r){ if (r && r.week) set[String(r.week)] = 1; });
   return Object.keys(set).sort(function(a,b){ return (Number(a)||0) - (Number(b)||0); });
 }
-// 重新生成表格模式顶部周次下拉的选项
+// 重新生成表格模式顶部周次下拉的选项（固定提供 1~21 周，另含已采集周）
 function populateConductWeekSelect() {
   var sel = document.getElementById('conductWeekSelect');
   if (!sel) return;
   var cur = sel.value;
-  sel.innerHTML = '<option value="">全部（累计）</option>' +
-    collectWeekList().map(function(w){ return '<option value="'+w+'">第'+w+'周</option>'; }).join('');
-  if (cur !== '') sel.value = cur;
+  var weeks = {};
+  for (var w = 1; w <= 21; w++) weeks[String(w)] = true;
+  collectWeekList().forEach(function(ww){ weeks[String(ww)] = true; });
+  var opts = Object.keys(weeks).sort(function(a,b){ return (Number(a)||0) - (Number(b)||0); }).map(function(w){ return '<option value="'+w+'">第'+w+'周</option>'; }).join('');
+  sel.innerHTML = '<option value="">全部（累计）</option>' + opts;
+  if (cur !== '' && weeks[cur] !== undefined) sel.value = cur; else sel.value = '';
 }
 // 按周聚合收集记录：返回 { fullId: { dim: 该周累计分 } }
 function buildWeeklyMatrix(weekStr) {
@@ -2546,23 +2549,23 @@ function initKanbanStudentCards() {
 function initHeatmap() {
   const grid = document.getElementById('heatmapGrid');
   grid.innerHTML = '';
-  // Group by dormitory
+  // 宿舍按“宿舍号前3位数字”分组（如 504-3 → 504），卡片分数=该宿舍学生总分的和
+  const pcNet = (s) => ((s.conduct.d1||0)+(s.conduct.d2||0)+(s.conduct.d3||0)+(s.conduct.d4||0)+(s.conduct.d5||0)+(s.conduct.d10||0)) - ((s.conduct.d6||0)+(s.conduct.d7||0)+(s.conduct.d8||0)+(s.conduct.d9||0)+(s.conduct.d11||0)+(s.conduct.d12||0));
   const dorms = {};
   students.forEach(s => {
-    if (!dorms[s.dorm]) dorms[s.dorm] = { name: s.dorm, students: [], totalDeduct: 0 };
-    dorms[s.dorm].students.push(s);
-    dorms[s.dorm].totalDeduct += s.conduct.d7;
+    const m = String(s.dorm || '').trim().match(/^(\d+)/);
+    const key = m ? m[1] : (String(s.dorm || '').trim() || '其他');
+    if (!dorms[key]) dorms[key] = { name: key, students: [] };
+    dorms[key].students.push(s);
   });
   Object.values(dorms).forEach(d => {
-    const avg = d.totalDeduct / d.students.length;
-    const isAlert = avg > 1.5;
+    const total = d.students.reduce((sum, s) => sum + pcNet(s), 0);
     const card = document.createElement('div');
-    card.className = 'heat-card' + (isAlert ? ' alert' : '');
-    const score = (10 - avg).toFixed(1);
+    card.className = 'heat-card';
     card.innerHTML = `
       <div class="hc-title">宿舍 ${d.name}</div>
-      <div class="hc-score" style="color:${isAlert?'var(--danger)':'var(--success-dark)'}">${score}</div>
-      <div class="hc-detail">${d.students.length}人 · 均扣${avg.toFixed(1)}分</div>
+      <div class="hc-score">${Number(total).toFixed(1)}</div>
+      <div class="hc-detail">${d.students.length}人 · 总分 ${Number(total).toFixed(1)}</div>
     `;
     grid.appendChild(card);
   });
