@@ -1673,6 +1673,9 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
           <button class="btn btn-default btn-block" onclick="hideModal('sbConfigSheet')" style="flex:1">取消</button>
           <button class="btn btn-primary btn-block" onclick="saveSbConfigMobile()" style="flex:2">保存并启用云端同步</button>
         </div>
+        <div style="padding:10px 16px;border-top:1px solid var(--border)">
+          <button class="btn btn-default btn-block" onclick="mCopyConfigLink()">🔗 复制本页分享链接（两端用此链接打开即可同步）</button>
+        </div>
       </div>
     </div>
     <!-- Class Settings Sheet -->
@@ -2269,9 +2272,13 @@ var SB_DEFAULT_URL = 'https://sjkvtsgqkzbhkzwpwsvd.supabase.co';
 var SB_DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqa3Z0c2dxa3piaGt6d3B3c3ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDcyMjgsImV4cCI6MjEwNDYyMzIyOH0.FYnAwcTXvAZ1kVQKmF9LGDAfhfH3ycjua1D2xCeziv8';
 function sbConfig() {
   try {
-    var raw = localStorage.getItem(SB_URL_KEY) || SB_DEFAULT_URL;
-    return { url: raw.replace(/\/rest\/.*$/i, ''), anon: localStorage.getItem(SB_ANON_KEY) || SB_DEFAULT_KEY };
-  } catch(e) { return { url: SB_DEFAULT_URL, anon: SB_DEFAULT_KEY }; }
+    var qUrl = '', qKey = '', fromUrl = false;
+    try { var qp = new URLSearchParams(location.search || ''); qUrl = (qp.get('sbUrl')||'').trim(); qKey = (qp.get('sbKey')||'').trim(); fromUrl = !!qUrl; } catch(e2){}
+    var url = qUrl || localStorage.getItem(SB_URL_KEY) || SB_DEFAULT_URL;
+    var anon = qKey || localStorage.getItem(SB_ANON_KEY) || SB_DEFAULT_KEY;
+    url = url.replace(/\/+$/, '').replace(/\/rest\/.*$/i, '');
+    return { url: url, anon: anon, fromUrl: fromUrl };
+  } catch(e) { return { url: SB_DEFAULT_URL, anon: SB_DEFAULT_KEY, fromUrl: false }; }
 }
 function sbEnabled() { var c = sbConfig(); return !!(c.url && c.anon); }
 function sbFetch(table, cb) {
@@ -2538,6 +2545,15 @@ function handleMConductWeekUpload(input) {
 }
 
 // ---------- Supabase 扩展工具（分享携带配置 / 考勤&待办写入）----------
+function mCopyConfigLink() {
+  var base = location.href.split('#')[0].split('?')[0];
+  var link = base + sbParam();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function(){ showToast('✅ 已复制分享链接，另一台设备用此链接打开即可同步'); });
+  } else {
+    try { var ta=document.createElement('textarea'); ta.value=link; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('✅ 已复制分享链接'); } catch(e){ showToast('复制失败，请长按选择复制'); }
+  }
+}
 function sbParam() {
   var c = sbConfig();
   if (!c.url || !c.anon) return '';
