@@ -176,6 +176,36 @@ function replayCloudRecords() {
 }
 replayCloudRecords();
 
+// ========== 从云端同步班级名单（class_settings.key='roster'）==========
+// PC端/手机端上传的名单存于云端，收集表启动时拉取覆盖本地模拟学生，
+// 保证"选择学生"下拉显示的是已上传的真实名单姓名。
+function loadCloudRoster() {
+  var c = sbConfig();
+  if (!c.url || !c.anon || !sbEnabled()) return;
+  fetch(c.url + '/rest/v1/class_settings?select=value&key=eq.roster&limit=1', {
+    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
+  }).then(function(r){ return r.json(); }).then(function(d){
+    try {
+      if (!Array.isArray(d) || !d.length || !d[0].value) return;
+      var arr = JSON.parse(d[0].value || '[]');
+      if (!Array.isArray(arr) || !arr.length) return;
+      students.length = 0;
+      arr.forEach(function(s){ students.push(s); });
+      // 补齐 violations/conduct 默认值，避免渲染/合计报错
+      students.forEach(function(s){
+        if (!Array.isArray(s.violations)) s.violations = [];
+        if (!s.conduct) s.conduct = {};
+        ['d7','d9','d11'].forEach(function(k){ if (s.conduct[k] === undefined) s.conduct[k] = 0; });
+        if (s.conduct.total === undefined) s.conduct.total = 100;
+      });
+      replayCollectRecords();
+      replayCloudRecords();
+      // 若表单已渲染则刷新，确保下拉立即显示新名单
+      if (document.getElementById('formView')) renderForm();
+    } catch(e){ console.error('loadCloudRoster', e); }
+  }).catch(function(){});
+}
+
 // ========== Toast ==========
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -307,7 +337,7 @@ function submitForm() {
 }
 
 // Auto-render on load
-document.addEventListener('DOMContentLoaded', renderForm);
+document.addEventListener('DOMContentLoaded', function(){ renderForm(); loadCloudRoster(); });
 </script>
 </body>
 </html>

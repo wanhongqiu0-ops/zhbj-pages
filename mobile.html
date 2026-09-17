@@ -980,7 +980,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <div class="section-title">今日待办 <span style="font-weight:400;color:var(--text-3);font-size:12px">5项</span></div>
         <div class="card">
           <div class="card-body">
-            <div class="todo-item">
+            <div class="todo-item" data-id="m-todo-1">
               <div class="todo-check" onclick="toggleTodo(this)"></div>
               <div class="todo-content">
                 <div class="todo-title">下午3点开班会（通知全班）</div>
@@ -988,7 +988,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
               </div>
               <span class="todo-badge tag tag-red">紧急</span>
             </div>
-            <div class="todo-item">
+            <div class="todo-item" data-id="m-todo-2">
               <div class="todo-check" onclick="toggleTodo(this)"></div>
               <div class="todo-content">
                 <div class="todo-title">审核张三病假申请</div>
@@ -996,7 +996,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
               </div>
               <span class="todo-badge tag tag-orange">待审</span>
             </div>
-            <div class="todo-item">
+            <div class="todo-item" data-id="m-todo-3">
               <div class="todo-check" onclick="toggleTodo(this)"></div>
               <div class="todo-content">
                 <div class="todo-title">下发第8周宿舍卫生评价任务</div>
@@ -1004,7 +1004,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
               </div>
               <span class="todo-badge tag tag-blue">17:00</span>
             </div>
-            <div class="todo-item done">
+            <div class="todo-item done" data-id="m-todo-4">
               <div class="todo-check done" onclick="toggleTodo(this)"></div>
               <div class="todo-content">
                 <div class="todo-title">升旗仪式集会点名</div>
@@ -2723,6 +2723,7 @@ function syncMTodosFromCloud() {
     Array.prototype.slice.call(container.querySelectorAll('.todo-item:not(.todo-inner)')).forEach(function(el){ el.remove(); });
     // 在 .todo-add 前插入云端待办
     (rows||[]).forEach(function(t) {
+      if (typeof mDelIs === 'function' && mDelIs(t.id)) return; // 已删除不再回归
       var div = document.createElement('div');
       div.className = 'todo-item' + (t.done ? ' done' : '');
       div.dataset.id = t.id;
@@ -2915,13 +2916,24 @@ function wireTodoSwipe(item, onDelete) {
   window.addEventListener('mouseup', function(e){ if (!mDown) return; mDown = false; var dx = e.clientX - mX; if (dx < -40) setOpen(true); else if (dx > 40) setOpen(false); });
 }
 function deleteTodoItem(wrap) {
-  var item = wrap.querySelector('.todo-item');
+  mDelMarkTodo(wrap);
+  var item = wrap && wrap.querySelector ? wrap.querySelector('.todo-item') : null;
   if (item && item.dataset && item.dataset.id && sbEnabled && sbEnabled() && typeof sbDeleteRow === 'function') {
     sbDeleteRow('todos', 'id=eq.' + encodeURIComponent(item.dataset.id));
   }
-  var pr = wrap.parentNode; if (pr) pr.removeChild(wrap);
+  var pr = wrap && wrap.parentNode; if (pr) pr.removeChild(wrap);
   showToast('已删除待办');
 }
+// 待办删除墓碑：删除只移除 DOM 的静态示例项后，刷新不应再出现；此处持久化已删除 id
+var M_DEL_KEY = 'smartclass_m_deleted';
+function mDelLoad(){ try { var a = JSON.parse(localStorage.getItem(M_DEL_KEY)); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
+function mDelSave(a){ try { localStorage.setItem(M_DEL_KEY, JSON.stringify(a)); } catch(e){} }
+function mDelMarkTodo(wrap){
+  var item = wrap && wrap.querySelector ? wrap.querySelector('.todo-item') : null;
+  if (!item || !item.dataset || !item.dataset.id) return;
+  var a = mDelLoad(); if (a.indexOf(item.dataset.id) < 0) { a.push(item.dataset.id); mDelSave(a); }
+}
+function mDelIs(id){ return !!id && mDelLoad().indexOf(id) !== -1; }
 // ========== 请假审批（本地 + 云端同步） ==========
 var MLEAVES_KEY = 'smartclass_leaves';
 function mLeavesLoad(){ try { return JSON.parse(localStorage.getItem(MLEAVES_KEY))||[]; } catch(e){ return []; } }
@@ -4400,6 +4412,15 @@ function applyCloudDuty(){
 function mTodayDutyName(){ return DUTY_DAY_NAMES[new Date().getDay()]; }
 function mDutyPeopleCount(items){ return items.reduce((s,it)=>s + (it.people? it.people.split('、').filter(Boolean).length:0),0); }
 function mRenderDuty(){
+  // 右上角日期显示为真实日期（如 9月16日 周三），而非静态示例
+  try {
+    var gd = document.querySelector('.g-date');
+    if (gd) {
+      var now = new Date();
+      var wd = ['日','一','二','三','四','五','六'][now.getDay()];
+      gd.textContent = (now.getMonth()+1) + '月' + now.getDate() + '日 周' + wd;
+    }
+  } catch(e){}
   const wrap=document.getElementById('dutyDayTag'), cnt=document.getElementById('dutyCount'), prev=document.getElementById('dutyPreview');
   if(!wrap||!cnt||!prev) return;
   const duty=mLoadDuty(), dayName=mTodayDutyName();
@@ -4488,6 +4509,10 @@ function showToast(msg) {
 // ========== Init ==========
 // 今日待办：为静态(未挂载)示例项挂载右滑删除；幂等，重复调用安全
 function wireTodoBottom(){
+  // 刷新时移除已删除(墓碑)的静态示例项，保证默认预设数据不再回归
+  Array.prototype.slice.call(document.querySelectorAll('.card-body .todo-item[data-id]')).forEach(function(it){
+    if (typeof mDelIs === 'function' && mDelIs(it.getAttribute('data-id'))) it.parentNode.removeChild(it);
+  });
   Array.prototype.slice.call(document.querySelectorAll('.card-body .todo-item:not(.todo-inner)')).forEach(function(it){
     wireTodoSwipe(it, function(){ deleteTodoItem(it.parentElement); });
   });
