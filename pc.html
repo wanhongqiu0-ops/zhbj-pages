@@ -3711,7 +3711,9 @@ function getConductShareUrl(file) {
   var base = getCollectBaseUrl();
   if (!base) return null;
   var p = sbParam(); // '' 或 '?sbUrl=..&sbKey=..'
-  var w = encodeURIComponent(String(currentCollectWeekPC()));
+  // 品德操行模块已选特定周次 → 链接自动带该周；未选（全部累计）用当前自然周
+  var selWk = (function(){ try { var s = document.getElementById('conductWeekSelect'); return s && s.value ? s.value : ''; } catch(e){ return ''; } })();
+  var w = encodeURIComponent(String(selWk && String(selWk).trim() !== '' ? selWk : currentCollectWeekPC()));
   var q = p ? p + '&week=' + w : '?week=' + w;
   return base + file + q;
 }

@@ -1045,6 +1045,12 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
           <button class="btn btn-outline btn-sm" onclick="showShareModal()">🔗 分享班长</button>
           <button class="btn btn-outline btn-sm" onclick="showExportAbsentModal()">📋 导出缺席</button>
           <button class="btn btn-danger btn-sm" onclick="endAttendance()">⏹ 结束</button>
+          <button class="btn btn-outline btn-sm" onclick="refreshMAttendance()">🔄 刷新本轮</button>
+        </div>
+
+        <div class="att-toolbar" style="flex-wrap:wrap;gap:6px">
+          <input type="text" id="mAttRemark" placeholder="本轮考勤备注（可选）" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
+          <span id="mAttTimeInfo" style="font-size:12px;color:var(--text-3);flex-basis:100%">—— 本日暂无上传记录 ——</span>
         </div>
 
         <div class="attendance-grid" id="mAttendanceGrid"><div class="att-btn unchecked" data-id="01">
@@ -2286,6 +2292,7 @@ var MC_ALL = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
 function mWeekTpl(){ try { if (!_mWeekTpl) _mWeekTpl = JSON.parse(localStorage.getItem('smartclass_conduct_weektpl')||'null') || {}; } catch(e){ _mWeekTpl = {}; } return _mWeekTpl; }
 function mSaveWeekTpl(){ try { localStorage.setItem('smartclass_conduct_weektpl', JSON.stringify(_mWeekTpl)); } catch(e){} }
 function mCurrentWeek(){ var s = document.getElementById('mConductWeekSelect'); return (s && s.value) ? s.value : ''; }
+function mDefWeek(){ try { if (typeof cwWeekOfYearM === 'function') return Math.min(21, Math.max(1, cwWeekOfYearM(new Date()))); } catch(e){} return 1; }
 function mMergeToWeekTplFromCloud(arr){
   try {
     var obj = JSON.parse(arr||'{}'); if(!obj || typeof obj!=='object') return;
@@ -2801,11 +2808,19 @@ function getCollectShareUrl(file) {
   return null;
 }
 function openConductCollect() {
-  var url = getCollectShareUrl('conduct_form.html');
+  var url = conductShareUrl();
   if (!url) { showToast('请先在PC端填写收集表云端URL'); return; }
   try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).catch(()=>{}); } catch(e){}
   window.open(url, '_blank');
   showToast('已打开品德操行收集表，链接已复制');
+}
+// 品德操行收集表分享链接：模块设置了特定周次时，链接自动带上该周，收集表页无需再手动选择
+function conductShareUrl() {
+  var base = getCollectShareUrl('conduct_form.html');
+  if (!base) return null;
+  var wk = mCurrentWeek() || mDefWeek();
+  var q = sbParam().replace(/^\?/, '&');
+  return base.replace(/(\?|#).*$/, '') + '?week=' + wk + q;
 }
 function openViolationCollect() {
   var url = getCollectShareUrl('violation_form.html');
@@ -3080,6 +3095,7 @@ function saveMAttRecord(){
     });
   }
   showToast('已保存 '+mAttDate+' 的考勤记录');
+  mPushAttRound();
 }
 function collapseMAtt(){
   mAttCollapsed=!mAttCollapsed;
@@ -3096,7 +3112,8 @@ function renderMAttRecords(){
   box.innerHTML=dates.map(function(d){
     var map=local[d]||{}, p=0,l=0,a=0;
     Object.keys(map).forEach(function(id){ var s=map[id]; if(s==='present')p++; else if(s==='leave')l++; else if(s==='absent')a++; });
-    return '<div onclick="loadMAttDate(\''+d+'\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:6px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px"><span>📅 '+d+(d===mAttDate?'（当前）':'')+'</span><span style="font-size:12px;color:var(--text-3)">到 '+p+' · 请 '+l+' · 缺 '+a+'</span></div>';
+    var rounds=(mAttLogLoad()[d]||[]), times=rounds.map(function(x){ return x.time+(x.remark?'('+x.remark+')':''); }).join('、');
+    return '<div onclick="loadMAttDate(\''+d+'\')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;margin-bottom:6px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px"><span>📅 '+d+(d===mAttDate?'（当前）':'')+'</span><span style="text-align:right;font-size:12px;color:var(--text-3)">到 '+p+' · 请 '+l+' · 缺 '+a+'<br>'+(rounds.length?'上传'+rounds.length+'次 '+(times.length>40?times.slice(0,40)+'…':times):'')+'</span></div>';
   }).join('');
   box.style.display='';
 }
@@ -3179,6 +3196,7 @@ function endAttendance() {
     }
   });
   updateMAttStats();
+  mPushAttRound();
   showToast('点名结束！缺勤学生已标记');
 }
 
@@ -3191,6 +3209,44 @@ function resetAttendance() {
   });
   updateMAttStats();
   showToast('已重置点名');
+}
+
+// ========== 考勤：刷新新一轮 + 多次记录 + 上传时间 + 备注 ==========
+const M_ATT_LOG = 'smartclass_att_log';
+function mAttLogLoad(){ try { return JSON.parse(localStorage.getItem(M_ATT_LOG))||{}; } catch(e){ return {}; } }
+function mAttLogSave(log){ try { localStorage.setItem(M_ATT_LOG, JSON.stringify(log)); } catch(e){} }
+function mLogToday(){ return mAttDate || todayStr(); }
+
+// 记录本轮(上传时间+备注+统计)进当日日志，支持同一天记录多次考勤
+function mPushAttRound(){
+  var st={p:0,l:0,a:0};
+  Object.values(mAttStates).forEach(function(s){ if(s==='present')st.p++; else if(s==='leave')st.l++; else if(s==='absent')st.a++; });
+  var ri=document.getElementById('mAttRemark');
+  var remark=(ri && ri.value)?ri.value.trim():'';
+  var t=new Date();
+  var hh=('0'+t.getHours()).slice(-2), mm=('0'+t.getMinutes()).slice(-2), ss=('0'+t.getSeconds()).slice(-2);
+  var d=mLogToday(), log=mAttLogLoad(), arr=log[d]||[];
+  arr.push({time:hh+':'+mm+':'+ss,remark:remark,p:st.p,l:st.l,a:st.a});
+  log[d]=arr; mAttLogSave(log);
+  showMAttRounds(true);
+  if(ri) ri.value='';
+}
+
+function showMAttRounds(lastOnly){
+  var info=document.getElementById('mAttTimeInfo'); if(!info) return;
+  var arr=(mAttLogLoad()[mLogToday()])||[];
+  if(!arr.length){ info.textContent='—— 本日暂无上传记录 ——'; return; }
+  if(lastOnly){ var x=arr[arr.length-1]; info.textContent='✅ 最近上传 '+x.time+(x.remark?' · '+x.remark:''); return; }
+  info.innerHTML='本日已上传 '+arr.length+' 次：'+arr.map(function(x){ return '<span style="color:var(--text-2)">'+x.time+(x.remark?'('+x.remark+')':'')+'</span>'; }).join('、');
+}
+
+// 刷新本轮：解除结束锁定，可再次点名；并从云端拉取最新状态展示
+function refreshMAttendance(){
+  mAttEnded=false;
+  if (typeof applyCloudMAttendance==='function'){ try { applyCloudMAttendance(); } catch(e){} }
+  updateMAttStats();
+  showMAttRounds(false);
+  showToast('已刷新，可开始新一轮点名');
 }
 
 // ========== Conduct ==========
@@ -3810,7 +3866,7 @@ function showCcShareSheet() {
   document.getElementById('ccScoreType').textContent = '分';
   document.getElementById('ccScoreType').style.color = '';
   showModal('conductCollectModal');
-  const url = getCollectShareUrl('conduct_form.html') || getShareUrl('conduct');
+  var url = conductShareUrl() || (getCollectShareUrl('conduct_form.html') || getShareUrl('conduct'));
   document.getElementById('ccLinkText').textContent = url;
   setTimeout(() => genQrcode('ccQrcode', url), 100);
 }
