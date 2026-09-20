@@ -2472,14 +2472,26 @@ function PcConductEdit(idx, dim, val) {
 function PcConductNotesHtml(s) {
   if (!s) return '—';
   var parts = [];
+  var seenImgs = {};
   if (s.conduct && s.conduct.note) parts.push('<span>'+s.conduct.note+'</span>');
   ((s.conduct && s.conduct.notes) || []).forEach(function(n){
     var line = '';
     if (n && n.date) line += '<div style="font-size:11px;color:var(--text-3)">'+n.date+'</div>';
-    if (n && n.img) line += '<img src="'+n.img+'" style="width:56px;height:56px;border-radius:4px;object-fit:cover;margin-top:3px;cursor:pointer" onclick="showPhotoPreview(\''+n.img+'\')">';
+    if (n && n.img){ if(n.img) seenImgs[n.img]=1; line += '<img src="'+n.img+'" style="width:56px;height:56px;border-radius:4px;object-fit:cover;margin-top:3px;cursor:pointer" onclick="showPhotoPreview(\''+n.img+'\')">'; }
     if (n && n.text) line += '<div>'+n.text+'</div>';
     if (line) parts.push(line);
   });
+  // 合并云端收集表回传的照片（含描述，去重）
+  try {
+    var cloudPhotos = (_cloudConductRows || []).filter(function(r){ return r && r.full_id === s.fullId && r.photo; });
+    cloudPhotos.forEach(function(r){
+      var img = String(r.photo || '');
+      if (!img || seenImgs[img]) return;
+      seenImgs[img] = 1;
+      var detail = (r.week ? '第'+r.week+'周' : '') + (r.description ? ' '+r.description : '');
+      parts.push('<div style="font-size:11px;color:var(--text-3)">'+detail+'</div><img src="'+img+'" style="width:56px;height:56px;border-radius:4px;object-fit:cover;margin-top:3px;cursor:pointer;border:1px solid var(--border)" onclick="showPhotoPreview(\''+img+'\')">');
+    });
+  } catch(e){}
   return parts.join('') || '—';
 }
 // ================== 品德操行表格 右滑删除（本地隐藏墓碑）+ 恢复 ==================

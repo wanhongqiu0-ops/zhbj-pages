@@ -3281,6 +3281,7 @@ function initConductCards() {
         }).join('')}
         <div class="cci-dim"><span class="cd-label">总分</span><span id="cdScoreDim_${s.fullId}" class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
       </div>
+      ${typeof mConductPhotoThumbs==='function'?mConductPhotoThumbs(s):''}
     `;
     list.appendChild(card);
   });
@@ -3536,6 +3537,22 @@ function renderMViolationList(s) {
       <span class="vi-score ${v.isBonus?'bonus':''}">${v.isBonus?'+':'-'}${v.score}</span>
     </div>
   `).join('') + '</div>';
+}
+
+// 品德操行表格模块：收集表拍照上传图片在卡片中显示为缩略图（本地备注 + 云端回传，去重），点击放大
+function mConductPhotoThumbs(s) {
+  if (!s) return '';
+  var seen = {}, html = '', has = false;
+  ((s.conduct && s.conduct.notes) || []).forEach(function(n){
+    if (n && n.photo && !seen[n.photo]) { seen[n.photo]=1; html += '<img src="'+n.photo+'" style="width:56px;height:56px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)" onclick="showPhotoPreview(this.src)">'; has = true; }
+  });
+  try {
+    (_mCloudConductRows || []).forEach(function(r){
+      if (r && r.full_id === s.fullId && r.photo) { var img = String(r.photo); if (!img || seen[img]) return; seen[img]=1; html += '<img src="'+img+'" style="width:56px;height:56px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)" onclick="showPhotoPreview(this.src)">'; has = true; }
+    });
+  } catch(e){}
+  if (!has) return '';
+  return '<div style="margin-top:8px"><div style="font-size:11px;color:var(--text-3);margin-bottom:4px">📷 收集表图片（点击放大）</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+html+'</div></div>';
 }
 
 // 品德操行收集表上传的图片/备注：学生档案中以缩略图展示，点击放大查看
