@@ -275,6 +275,7 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .sc-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 6px; }
 .sc-item .sc-label { color: var(--text-3); }
 .sc-item .sc-val { font-weight: 500; }
+.student-card .sc-dims { max-height: 190px; overflow-y: auto; margin-bottom: 4px; }
 
 .heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .heat-card { background: #fff; border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); border: 2px solid transparent; }
@@ -745,6 +746,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 560px; mar
             <select class="form-select" style="width:120px" id="conductWeekSelect" onchange="onConductWeekChange(this)"></select>
             <button class="btn btn-default btn-sm" onclick="downloadConductTemplate()">⬇ 下载空模板</button>
             <button class="btn btn-default btn-sm" onclick="uploadConductTemplate()">⬆ 上传填写好的模板</button>
+            <button class="btn btn-default btn-sm" onclick="pcRestoreConductHidden()">↩ 恢复已删行</button>
           </div>
           <div class="collect-dropdown" id="conductCollectDropdown">
             <button class="btn btn-primary btn-sm" onclick="toggleConductCollectDD(event)">📤 收集表链接 ▾</button>
@@ -2480,6 +2482,71 @@ function PcConductNotesHtml(s) {
   });
   return parts.join('') || '—';
 }
+// ================== 品德操行表格 右滑删除（本地隐藏墓碑）+ 恢复 ==================
+var CONDUCT_HIDDEN_KEY = 'smartclass_pc_conduct_hidden';
+function pcConductHidden(){
+  try { var arr = JSON.parse(localStorage.getItem(CONDUCT_HIDDEN_KEY) || '[]'); return Array.isArray(arr) ? arr : []; } catch(e){ return []; }
+}
+function pcConductHiddenSave(arr){
+  try { localStorage.setItem(CONDUCT_HIDDEN_KEY, JSON.stringify(arr || [])); } catch(e){}
+}
+function pcIsConductHidden(fid){
+  try { return pcConductHidden().indexOf(fid) !== -1; } catch(e){ return false; }
+}
+// 给某行表格行绑定右滑删除手势（优先 PointerEvent，touch 兜底）
+function pcBindSwipeRemove(trEl, fid){
+  try {
+    if (!trEl) return;
+    var startX = 0, startY = 0, tracking = false;
+    function endHandler(e, x, y){
+      var dx = x - startX, dy = y - startY;
+      tracking = false;
+      if (dx > 70 && dx > Math.abs(dy)) { if (e && e.preventDefault) { try { e.preventDefault(); } catch(_){ } } pcMarkConductRowDel(fid, trEl); }
+    }
+    function startHandler(e){
+      var t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      startX = t.clientX; startY = t.clientY; tracking = true;
+    }
+    if (window.PointerEvent) {
+      trEl.addEventListener('pointerdown', function(e){ startHandler(e); });
+      trEl.addEventListener('pointermove', function(){}, { passive: true });
+      trEl.addEventListener('pointerup', function(e){ if (tracking) endHandler(e, e.clientX, e.clientY); });
+      trEl.addEventListener('pointercancel', function(){ tracking = false; });
+    } else {
+      trEl.addEventListener('touchstart', function(e){ startHandler(e); }, { passive: true });
+      trEl.addEventListener('touchmove', function(){}, { passive: true });
+      trEl.addEventListener('touchend', function(e){ if (!tracking) return; var t = e.changedTouches && e.changedTouches[0]; endHandler(e, t ? t.clientX : startX, t ? t.clientY : startY); });
+      trEl.addEventListener('touchcancel', function(){ tracking = false; });
+    }
+  } catch(e){}
+}
+// 删除整行：写入隐藏列表 → 淡出 → 移除 DOM → 重排当前视图
+function pcMarkConductRowDel(fid, trEl){
+  try {
+    if (!fid || pcIsConductHidden(fid)) return;
+    var arr = pcConductHidden(); arr.push(fid); pcConductHiddenSave(arr);
+    if (trEl) {
+      try {
+        trEl.style.transition = 'opacity .3s';
+        trEl.style.opacity = '0';
+        setTimeout(function(){ try { if (trEl.parentNode) trEl.parentNode.removeChild(trEl); } catch(e){ } }, 300);
+      } catch(e){ try { if (trEl.parentNode) trEl.parentNode.removeChild(trEl); } catch(e2){ } }
+    }
+    if (currentConductWeek()) { try { renderConductWeekTable(String(currentConductWeek())); } catch(e){ } }
+    else { try { initConductTable(); } catch(e){ } }
+  } catch(e){ }
+}
+// 恢复已删除行：确认后清空隐藏列表并重渲染
+function pcRestoreConductHidden(){
+  try {
+    var arr = pcConductHidden();
+    if (!arr.length) { try { showToast('当前没有隐藏/删除的操行行'); } catch(e){ } return; }
+    if (!confirm('确认恢复已删除的 ' + arr.length + ' 个学生行吗？')) return;
+    pcConductHiddenSave([]);
+    if (currentConductWeek()) { try { renderConductWeekTable(String(currentConductWeek())); } catch(e){ } }
+    else { try { initConductTable(); } catch(e){ } }
+  } catch(e){ }
+}
 function initConductTable() {
   // “全部（累计）”：只读展示各周填入数据的合计（周模板快照 + 各周收集记录），不提供手动录入
   const tbody = document.getElementById('conductTableBody');
@@ -2491,6 +2558,7 @@ function initConductTable() {
   sorted.forEach((s, i) => rankMap[s.id] = i + 1);
 
   students.forEach((s) => {
+    if (pcIsConductHidden(s.fullId)) return;
     const tr = document.createElement('tr');
     const avatarColor = s.color;
     const numCell = dim => { const v = pcAllWeekDim(s, dim); const col = isAdd(dim)?'var(--success-dark)':'var(--danger)'; return '<td style="font-weight:600;color:'+col+'">'+(v||0)+'</td>'; };
@@ -2510,6 +2578,7 @@ function initConductTable() {
       <td><span class="tag ${rankMap[s.id]<=3?'tag-green':rankMap[s.id]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.id]}名</span></td>
     `;
     tbody.appendChild(tr);
+    pcBindSwipeRemove(tr, s.fullId);
   });
 
   // Calc averages (各维度的周次合计均值)
@@ -2569,6 +2638,7 @@ function renderConductWeekTable(weekStr) {
 
   tbody.innerHTML = '';
   students.forEach(function(s){
+    if (pcIsConductHidden(s.fullId)) return;
     var cm = eff[s.fullId] || {};
     var v = function(k){ return cm[k] || 0; };
     var total = weekTotalMap[s.fullId];
@@ -2583,6 +2653,7 @@ function renderConductWeekTable(weekStr) {
       <td id="wrk-${s.fullId}"><span class="tag ${rankMap[s.fullId]<=3?'tag-green':rankMap[s.fullId]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.fullId]}名</span></td>
     `;
     tbody.appendChild(tr);
+    pcBindSwipeRemove(tr, s.fullId);
   });
 
   // 周平均
@@ -2638,13 +2709,25 @@ function initKanbanStudentCards() {
     const card = document.createElement('div');
     card.className = 'student-card';
     card.onclick = () => showStudentDetail(s);
-    const dims = [
+    // 全部加减分选项：加分维度（绿色，+值）、减分维度（红色，-值）
+    const addDims = [
+      { label: '黑板报', key: 'd1', max: 10 },
+      { label: '好人好事', key: 'd2', max: 10 },
+      { label: '志愿/比赛', key: 'd3', max: 10 },
+      { label: '班干部', key: 'd4', max: 10 },
+      { label: '团体活动', key: 'd5', max: 10 },
+      { label: '课堂加分', key: 'd10', max: 10 },
+    ];
+    const dedDims = [
       { label: '班级卫生', key: 'd6', max: 10, color: '#FF4D4F' },
       { label: '宿舍/手机', key: 'd7', max: 10, color: '#FA8C16' },
       { label: '晚修纪律', key: 'd8', max: 10, color: '#722ED1' },
       { label: '课堂/作业', key: 'd9', max: 10, color: '#13C2C2' },
       { label: '出勤/仪容', key: 'd11', max: 10, color: '#1677FF' },
+      { label: '违规', key: 'd12', max: 10, color: '#FF4D4F' },
     ];
+    const dims = dedDims.map(d => Object.assign({ type: 'ded' }, d))
+      .concat(addDims.map(d => Object.assign({ type: 'add' }, d)));
     card.innerHTML = `
       <div class="sc-score ${scoreClass}">${score}</div>
       <div class="sc-header">
@@ -2654,15 +2737,21 @@ function initKanbanStudentCards() {
           <div class="sc-id">${s.id} · ${s.dorm}</div>
         </div>
       </div>
+      <div class="sc-dims">
       ${dims.map(d => {
-        const dv = pcWeekDimVal(s, _wk, d.key);
+        const dv = pcWeekDimVal(s, _wk, d.key) || 0;
+        const isAdd = d.type === 'add';
+        const col = dv > 0 ? (isAdd ? 'var(--success-dark)' : 'var(--danger)') : 'var(--text-3)';
+        const sign = isAdd ? '+' : '-';
+        const shown = dv > 0 ? sign + dv : '0';
         return `
         <div class="sc-item">
           <span class="sc-label">${d.label}</span>
-          <span class="sc-val" style="color:${dv>0?'var(--danger)':'var(--text-3)'}">${dv>0?'-'+dv:'0'}</span>
+          <span class="sc-val" style="color:${col}">${shown}</span>
         </div>
-        <div class="progress-bar"><div class="fill" style="width:${(dv/d.max)*100}%;background:${d.color}"></div></div>
+        <div class="progress-bar"><div class="fill" style="width:${(dv/d.max)*100}%;background:${d.color || (isAdd ? 'var(--success-dark)' : '#FF4D4F')}"></div></div>
       `;}).join('')}
+      </div>
     `;
     grid.appendChild(card);
   });
@@ -2732,21 +2821,59 @@ function initDeductChart() {
 function initInfoStream() {
   const stream = document.getElementById('infoStream');
   if (!stream) return;
-  const events = [
-    { time: '14:32', name: '张三', action: '因宿舍卫生被扣', detail: '1分', tag: '宿舍卫生' },
-    { time: '14:28', name: '李四', action: '因课堂纪律被扣', detail: '2分', tag: '课堂纪律' },
-    { time: '14:20', name: '王五', action: '因仪容仪表被扣', detail: '1分', tag: '仪容仪表' },
-    { time: '14:15', name: '赵六', action: '因班级卫生被扣', detail: '1分', tag: '班级卫生' },
-    { time: '14:08', name: '钱七', action: '获得加分', detail: '+2分（主动值日）', tag: '加分项' },
-    { time: '13:55', name: '孙八', action: '因宿舍卫生被扣', detail: '3分', tag: '宿舍卫生' },
-    { time: '13:40', name: '周九', action: '因课堂纪律被扣', detail: '1分', tag: '课堂纪律' },
-  ];
-  stream.innerHTML = events.map(e => `
-    <div class="info-stream-item">
-      <span class="is-time">${e.time}</span>
-      <span class="is-content"><span class="is-name">${e.name}</span> ${e.action} <span style="color:var(--danger);font-weight:600">${e.detail}</span></span>
-    </div>
-  `).join('');
+  try {
+    const wk = currentConductWeek();
+    const dimNames = { d1:'黑板报', d2:'好人好事', d3:'志愿者', d4:'班干部', d5:'团体活动', d6:'班级卫生', d7:'宿舍/手机', d8:'晚修纪律', d9:'课堂/作业', d10:'课堂加分', d11:'出勤/仪容', d12:'违规/其他' };
+    const nameOf = function(fid){ var s = students.find(function(x){ return x.fullId === fid || x.id === fid; }); return s ? s.name : fid; };
+    const fmtTime = function(ts, date, week){
+      try {
+        if (ts !== undefined && ts !== null && ts !== '') {
+          if (typeof ts === 'string' && ts.indexOf('T') !== -1) { var p = ts.split('T')[1]; var hp = (p||'').split(':')[0]; var mp = (p||'').split(':')[1]; if (hp !== undefined && mp !== undefined) return hp + ':' + mp; }
+          var num = Number(ts);
+          if (!isNaN(num) && ts !== '' && String(ts).length <= 11) { var d = new Date(num * 1000); if (!isNaN(d.getTime())) return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+          if (!isNaN(num) && String(ts).length > 11) { var d2 = new Date(num); if (!isNaN(d2.getTime())) return pad2(d2.getHours()) + ':' + pad2(d2.getMinutes()); }
+          var dt = new Date(ts); if (!isNaN(dt.getTime())) return pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
+        }
+        if (date !== undefined && date !== null && date !== '') { var dd = new Date(date); if (!isNaN(dd.getTime())) return pad2(dd.getHours()) + ':' + pad2(dd.getMinutes()); }
+        if (week !== undefined && week !== null && week !== '') return '第' + week + '周';
+      } catch(e){ }
+      return '--:--';
+    };
+    const pad2 = function(n){ return (n < 10 ? '0' : '') + n; };
+    const events = [];
+    const push = function(fid, dim, score, ts, date, week){
+      if (!fid || !dim || score === undefined || score === null) return;
+      const isAdd = CONDUCT_ADD_DIMS.indexOf(dim) !== -1;
+      const sgn = isAdd ? '+' : '-';
+      events.push({
+        time: fmtTime(ts, date, week),
+        name: nameOf(fid),
+        action: isAdd ? '获得加分' : '被扣分',
+        detail: sgn + (score||0) + '分',
+        tag: (dimNames[dim] || dim),
+        _sort: (function(){ try { if (ts !== undefined && ts !== null && ts !== '' && !isNaN(Number(ts))) return Number(ts); var t = new Date(ts); return isNaN(t.getTime()) ? 0 : t.getTime(); } catch(e){ return 0; } })(),
+        add: isAdd
+      });
+    };
+    if (wk) {
+      (_cloudConductRows || []).forEach(function(r){ if (r && String(r.week) === String(wk) && r.full_id && r.dim) push(r.full_id, r.dim, r.score, r.ts, r.date, r.week); });
+      loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r){ if (r && String(r.week) === String(wk) && r.fullId && r.dim) push(r.fullId, r.dim, r.score, r.ts, r.date, r.week); });
+    } else {
+      (_cloudConductRows || []).forEach(function(r){ if (r && r.full_id && r.dim) push(r.full_id, r.dim, r.score, r.ts, r.date, r.week); });
+      loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r){ if (r && r.fullId && r.dim) push(r.fullId, r.dim, r.score, r.ts, r.date, r.week); });
+    }
+    events.sort(function(a, b){ return (b._sort || 0) - (a._sort || 0); });
+    if (!events.length) {
+      stream.innerHTML = '<div class="info-stream-item"><span class="is-time">--:--</span><span class="is-content" style="color:var(--text-3)">暂无扣分/加分记录</span></div>';
+      return;
+    }
+    stream.innerHTML = events.map(e => `
+      <div class="info-stream-item">
+        <span class="is-time">${e.time}</span>
+        <span class="is-content"><span class="is-name">${e.name}</span> ${e.action} <span style="color:${e.add?'var(--success-dark)':'var(--danger)'};font-weight:600">${e.detail}</span> <span class="tag ${e.add?'tag-green':'tag-red'}">${e.tag}</span></span>
+      </div>
+    `).join('');
+  } catch(err) { try { console.error('initInfoStream', err); } catch(e){ } }
 }
 
 function initKanbanCharts() {

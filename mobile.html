@@ -3272,8 +3272,8 @@ function initConductCards() {
         </div>
         <div class="cci-score ${sc}" id="cdScoreTop_${s.fullId}">${score}</div>
       </div>
-      <div class="cci-dims">
-        ${[['d1','黑板报','add'],['d2','好人好事','add'],['d4','班干部','add'],['d6','班级卫生','sub'],['d7','宿舍/手机','sub'],['d8','晚修纪律','sub'],['d9','课堂/作业','sub'],['d11','出勤/仪容','sub']].map(function(d){
+      <div class="cci-dims" style="max-height:180px;overflow-y:auto;padding-right:4px;">
+        ${[['d1','黑板报','add'],['d2','好人好事','add'],['d3','志愿者/比赛','add'],['d4','班干部','add'],['d5','团体活动','add'],['d10','课堂加分','add'],['d6','班级卫生','sub'],['d7','宿舍/手机','sub'],['d8','晚修纪律','sub'],['d9','课堂/作业','sub'],['d11','出勤/仪容','sub'],['d12','违规','sub']].map(function(d){
           var key=d[0], lab=d[1], pos=(d[2]==='add');
           var v=valOf(s,key);
           if (readonly) return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><span class="cd-val" style="font-weight:700;color:'+(pos?'var(--success-dark)':'var(--danger)')+'">'+(v||0)+'</span></div>';
