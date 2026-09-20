@@ -3258,7 +3258,7 @@ function initConductCards() {
   const readonly = !_wk;
   const valOf = (s, key) => readonly ? mAllWeekDim(s, key) : mWeekDimVal(s, _wk, key);
   const totalOf = (s) => readonly ? mAllWeekTotal(s) : mWeekTotal(s, _wk);
-  students.slice(0, 15).forEach(s => {
+  students.forEach(s => {
     const score = totalOf(s);
     const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
@@ -3284,13 +3284,13 @@ function initConductCards() {
     `;
     list.appendChild(card);
   });
-  // Load more hint
+  // 尾部提示：已显示全部学生
   const more = document.createElement('div');
   more.style.textAlign = 'center';
   more.style.padding = '12px';
   more.style.color = 'var(--text-3)';
   more.style.fontSize = '12px';
-  more.textContent = '上拉加载更多（共58人）';
+  more.textContent = '共 ' + students.length + ' 人，全部显示 · 向下滚动可查看';
   list.appendChild(more);
 }
 
