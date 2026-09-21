@@ -3411,21 +3411,72 @@ function initMCharts() {
     hg.appendChild(card);
   });
 
-  // Info stream
-  const is = document.getElementById('mInfoStream');
-  if (is) {
-    const events = [
-      { t:'14:32', n:'张三', a:'宿舍/手机扣', d:'1分' },
-      { t:'14:28', n:'李四', a:'课堂/作业扣', d:'2分' },
-      { t:'14:20', n:'王五', a:'晚修纪律扣', d:'1分' },
-      { t:'14:15', n:'赵六', a:'出勤/仪容扣', d:'1分' },
-      { t:'14:08', n:'钱七', a:'班干部加分', d:'+2分' },
-      { t:'13:55', n:'孙八', a:'班级卫生扣', d:'3分' },
-    ];
-    is.innerHTML = events.map(e=>`<div class="info-item"><span class="ii-time">${e.t}</span><span class="ii-content"><span class="ii-name">${e.n}</span> ${e.a} <span style="color:var(--danger);font-weight:600">${e.d}</span></span></div>`).join('');
-  }
+  // Info stream：真实周评分记录（与 PC 端 initInfoStream 逻辑一致）
+  mInfoStream();
   // 个人学生卡片：与 PC 端看板同步（选周随周联动；全部时显示各周总和；可滚动查看更多）
   initMKanbanCards();
+}
+
+// 手机看板：真实动态信息流（周评分记录：云端 + 本地收集，按所选周筛选、时间/序号倒序）
+function mInfoStream() {
+  const stream = document.getElementById('mInfoStream');
+  if (!stream) return;
+  try {
+    const wk = mCurrentWeek(); // '' = 全部周
+    const dimNames = { d1:'黑板报', d2:'好人好事', d3:'志愿者', d4:'班干部', d5:'团体活动', d6:'班级卫生', d7:'宿舍/手机', d8:'晚修纪律', d9:'课堂/作业', d10:'课堂加分', d11:'出勤/仪容', d12:'违规/其他' };
+    const nameOf = function(fid){ var s = students.find(function(x){ return x.fullId === fid || x.id === fid; }); return s ? s.name : fid; };
+    const pad2 = function(n){ n = Number(n); return (isNaN(n) ? n : (n < 10 ? '0' + n : String(n))); };
+    const fmtTime = function(ts, date, week){
+      try {
+        if (ts !== undefined && ts !== null && ts !== '') {
+          if (typeof ts === 'string' && ts.indexOf('T') !== -1) { var p = ts.split('T')[1]; var hp = (p||'').split(':')[0]; var mp = (p||'').split(':')[1]; if (hp !== undefined && mp !== undefined) return pad2(hp) + ':' + pad2(mp); }
+          var num = Number(ts);
+          if (!isNaN(num) && ts !== '' && String(ts).length <= 11) { var d = new Date(num * 1000); if (!isNaN(d.getTime())) return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+          if (!isNaN(num) && String(ts).length > 11) { var d2 = new Date(num); if (!isNaN(d2.getTime())) return pad2(d2.getHours()) + ':' + pad2(d2.getMinutes()); }
+          var dt = new Date(ts); if (!isNaN(dt.getTime())) return pad2(dt.getHours()) + ':' + pad2(dt.getMinutes());
+        }
+        if (date !== undefined && date !== null && date !== '') { var dd = new Date(date); if (!isNaN(dd.getTime())) return pad2(dd.getHours()) + ':' + pad2(dd.getMinutes()); }
+        if (week !== undefined && week !== null && week !== '') return '第' + week + '周';
+      } catch(e){ }
+      return '--:--';
+    };
+    const events = [];
+    const push = function(fid, dim, score, ts, date, week){
+      if (!fid || !dim || score === undefined || score === null) return;
+      const isAdd = MC_ADD.indexOf(dim) !== -1;
+      const sgn = isAdd ? '+' : '-';
+      events.push({
+        time: fmtTime(ts, date, week),
+        name: nameOf(fid),
+        action: isAdd ? '获得加分' : '被扣分',
+        detail: sgn + (score||0) + '分',
+        tag: (dimNames[dim] || dim),
+        _sort: (function(){ try { if (ts !== undefined && ts !== null && ts !== '' && !isNaN(Number(ts))) return Number(ts); var t = new Date(ts); return isNaN(t.getTime()) ? 0 : t.getTime(); } catch(e){ return 0; } })(),
+        add: isAdd
+      });
+    };
+    var cloudRows = (_mCloudConductRows || []);
+    var localRows = [];
+    try { localRows = JSON.parse(localStorage.getItem('smartclass_conduct_collect')||'[]') || []; } catch(e){ localRows = []; }
+    if (wk) {
+      cloudRows.forEach(function(r){ if (r && String(r.week) === String(wk) && r.full_id && r.dim) push(r.full_id, r.dim, r.score, r.ts, r.date, r.week); });
+      localRows.forEach(function(r){ if (r && String(r.week) === String(wk) && r.fullId && r.dim) push(r.fullId, r.dim, r.score, r.ts, r.date, r.week); });
+    } else {
+      cloudRows.forEach(function(r){ if (r && r.full_id && r.dim) push(r.full_id, r.dim, r.score, r.ts, r.date, r.week); });
+      localRows.forEach(function(r){ if (r && r.fullId && r.dim) push(r.fullId, r.dim, r.score, r.ts, r.date, r.week); });
+    }
+    events.sort(function(a, b){ return (b._sort || 0) - (a._sort || 0); });
+    if (!events.length) {
+      stream.innerHTML = '<div class="info-item"><span class="ii-time">--:--</span><span class="ii-content" style="color:var(--text-3)">暂无记录</span></div>';
+      return;
+    }
+    stream.innerHTML = events.map(e => `
+      <div class="info-item">
+        <span class="ii-time">${e.time}</span>
+        <span class="ii-content"><span class="ii-name">${e.name}</span> ${e.action} <span style="color:${e.add?'var(--success-dark)':'var(--danger)'};font-weight:600">${e.detail}</span> ${e.tag}</span>
+      </div>
+    `).join('');
+  } catch(err) { try { console.error('mInfoStream', err); } catch(e){} }
 }
 
 // 手机看板：个人学生卡片

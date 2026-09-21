@@ -237,6 +237,9 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .conduct-tab:hover { color: var(--primary); }
 
 .conduct-table-wrap { overflow: auto; border-radius: var(--radius); border: 1px solid var(--border); background: #fff; }
+/* 品德操行表格：限高后内部滚动，表头吸顶固定在可视区上方 */
+#page-conduct-table .conduct-table-wrap { max-height: calc(100vh - 220px); }
+#page-conduct-table .conduct-table-wrap thead th { position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 var(--border); }
 .conduct-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .conduct-table th { background: #FAFAFA; padding: 10px 12px; text-align: center; font-weight: 600; color: var(--text-2); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border-light); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
 .conduct-table th:first-child { text-align: left; min-width: 140px; }
@@ -2617,7 +2620,7 @@ function initConductTable() {
   const rankMap = {};
   sorted.forEach((s, i) => rankMap[s.id] = i + 1);
 
-  students.forEach((s) => {
+  sorted.forEach((s) => {
     if (pcIsConductHidden(s.fullId)) return;
     const tr = document.createElement('tr');
     const avatarColor = s.color;
@@ -2698,7 +2701,7 @@ function renderConductWeekTable(weekStr) {
   var rankMap = {}; sorted.forEach(function(s, i){ rankMap[s.fullId] = i + 1; });
 
   tbody.innerHTML = '';
-  students.forEach(function(s){
+  sorted.forEach(function(s){
     if (pcIsConductHidden(s.fullId)) return;
     var cm = eff[s.fullId] || {};
     var v = function(k){ return cm[k] || 0; };
