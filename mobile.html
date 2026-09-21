@@ -2321,12 +2321,13 @@ function mWeekTotal(s, wk){
   var cm = mWeekMatrix(String(wk))[s.fullId] || {};
   var sn = (mWeekTpl()[String(wk)] || {})[s.fullId];
   var snDims = (sn && sn.dims) ? sn.dims : null;
-  var add = 0, ded = 0;
+  var sum = 0;
+  // 总分 = 各栏（正负号）算术相加
   MC_ALL.forEach(function(k){
     var val = (snDims && snDims[k] !== undefined) ? snDims[k] : (cm[k] || 0);
-    if (MC_ADD.indexOf(k) >= 0) add += val; else ded += val;
+    sum += val;
   });
-  return add - ded;
+  return sum;
 }
 // 某学生某周某个维度的数值：选周时取“该周模板快照优先，否则当周收集记录”；未选周(累计)取累计 s.conduct[k]
 function mWeekDimVal(s, wk, k) {
@@ -2343,13 +2344,17 @@ function mAllWeekDim(s, k) {
   return sum;
 }
 function mAllWeekTotal(s) {
-  var add = 0, ded = 0;
-  MC_ALL.forEach(function(k){ var v = mAllWeekDim(s, k); if (MC_ADD.indexOf(k) >= 0) add += v; else ded += v; });
-  return add - ded;
+  var sum = 0;
+  MC_ALL.forEach(function(k){ sum += mAllWeekDim(s, k); }); // 各栏（正负号）求和
+  return sum;
 }
 function mWeekMatrix(wk){
   var m = {};
-  function add(fid, dm, sc){ var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (sc || 0); }
+  function add(fid, dm, sc){
+    // 按“每列真实正负号”计入：加分维度原样，减分维度取负（扣分为负），总分=各栏相加
+    if (MC_ADD.indexOf(dm) < 0) sc = -(sc || 0);
+    var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (sc || 0);
+  }
   try { var recs = JSON.parse(localStorage.getItem('smartclass_conduct_collect')||'[]') || []; recs.forEach(function(r){ if (r && String(r.week) === String(wk) && r.fullId && r.dim) add(r.fullId, r.dim, r.score); }); } catch(e){}
   (_mCloudConductRows || []).forEach(function(r){ if (r && String(r.week) === String(wk) && r.full_id && r.dim) add(r.full_id, r.dim, r.score); });
   return m;

@@ -2048,7 +2048,11 @@ function onKanbanWeekChange(sel) {
 // 按周聚合收集记录：返回 { fullId: { dim: 该周累计分 } }
 function buildWeeklyMatrix(weekStr) {
   var m = {};
-  function add(fid, dm, score) { var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (score || 0); }
+  function add(fid, dm, score) {
+    // 按“每列的真实正负号”计入：加分维度原样，减分维度取负（即扣分为负值），总分即各栏相加
+    if (CONDUCT_ADD_DIMS.indexOf(dm) < 0) score = -(score || 0);
+    var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (score || 0);
+  }
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r){
     if (r && String(r.week) === weekStr && r.fullId && r.dim) add(r.fullId, r.dim, r.score);
   });
@@ -2404,13 +2408,14 @@ function pcWeekTotal(s, wk){
   var rec = m[s.fullId] || {};
   var sn = (loadWeekTpl()[String(wk)] || {})[s.fullId];
   var snDims = (sn && sn.dims) ? sn.dims : null;
-  var add = 0, ded = 0;
+  var sum = 0;
+  // 总分 = 各栏（正负号）算术相加
   CONDUCT_ALL_DIMS.forEach(function(k){
     var val = rec[k] || 0;
     if (snDims && snDims[k] !== undefined) val = snDims[k];
-    if (CONDUCT_ADD_DIMS.indexOf(k) >= 0) add += val; else ded += val;
+    sum += val;
   });
-  return add - ded;
+  return sum;
 }
 // “全部（累计）”仅读取展示：某学生某维度在 1~21 周的数据总和（周模板快照 + 当周收集记录）
 function pcAllWeekDim(s, k) {
@@ -2419,9 +2424,9 @@ function pcAllWeekDim(s, k) {
   return sum;
 }
 function pcAllWeekTotal(s) {
-  var add = 0, ded = 0;
-  CONDUCT_ALL_DIMS.forEach(function(k){ var v = pcAllWeekDim(s, k); if (CONDUCT_ADD_DIMS.indexOf(k) >= 0) add += v; else ded += v; });
-  return add - ded;
+  var sum = 0;
+  CONDUCT_ALL_DIMS.forEach(function(k){ sum += pcAllWeekDim(s, k); }); // 各栏（正负号）求和
+  return sum;
 }
 // 某学生某周某个维度的数值：选周时取“该周模板快照优先，否则当周收集记录”；未选周(累计)取累计 s.conduct[k]
 function pcWeekDimVal(s, wk, k) {
