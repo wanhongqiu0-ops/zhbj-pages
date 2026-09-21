@@ -563,6 +563,9 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .m-kanban-cards .mk-card .mk-id { font-size: 10px; color: var(--text-3); }
 .m-kanban-cards .mk-card .mk-dim { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); padding: 1px 0; }
 .m-kanban-cards .mk-card .mk-dim .mk-dv { font-weight: 700; }
+.m-kanban-cards .mk-card.mk-top3 { border: 2px solid #f4b400; box-shadow: 0 0 12px rgba(244,180,0,0.5); }
+.m-kanban-cards .mk-card .mk-rank { margin-top: 6px; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #8a6110; background: rgba(244,180,0,0.18); text-align: center; }
+.m-kanban-cards .mk-card.mk-top3 .mk-rank { background: #f4b400; color: #fff; }
 
 .info-stream { max-height: 200px; overflow-y: auto; }
 .info-item { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-light); font-size: 12px; }
@@ -3269,7 +3272,8 @@ function initConductCards() {
   const readonly = !_wk;
   const valOf = (s, key) => readonly ? mAllWeekDim(s, key) : mWeekDimVal(s, _wk, key);
   const totalOf = (s) => readonly ? mAllWeekTotal(s) : mWeekTotal(s, _wk);
-  students.forEach(s => {
+  const sorted = students.slice().sort((a, b) => totalOf(b) - totalOf(a));
+  sorted.forEach(s => {
     const score = totalOf(s);
     const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
@@ -3439,11 +3443,13 @@ function initMKanbanCards() {
     { label: '出勤/仪容', key: 'd11', pos: false },
     { label: '班干部', key: 'd2', pos: true },
   ];
-  students.slice(0, 30).forEach(s => {
+  const sorted = students.slice().sort((a, b) => totalOf(b) - totalOf(a));
+  sorted.slice(0, 30).forEach((s, idx) => {
     const score = totalOf(s);
     const sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
+    const isTop3 = idx < 3;
     const card = document.createElement('div');
-    card.className = 'mk-card';
+    card.className = 'mk-card' + (isTop3 ? ' mk-top3' : '');
     card.innerHTML = `
       <div class="mk-score ${sc}">${score}</div>
       <div class="mk-head">
@@ -3459,6 +3465,7 @@ function initMKanbanCards() {
         const show = (v >= 0 ? '+' : '') + v;
         return `<div class="mk-dim"><span>${d.label}</span><span class="mk-dv" style="color:${color}">${show}</span></div>`;
       }).join('')}
+      ${isTop3 ? `<div class="mk-rank">第<span style="font-weight:800">${idx + 1}</span>名</div>` : ''}
     `;
     grid.appendChild(card);
   });
@@ -3549,17 +3556,37 @@ function renderMViolationList(s) {
 // 品德操行表格模块：收集表拍照上传图片在卡片中显示为缩略图（本地备注 + 云端回传，去重），点击放大
 function mConductPhotoThumbs(s) {
   if (!s) return '';
-  var seen = {}, html = '', has = false;
+  var seen = {}, photos = [];
   ((s.conduct && s.conduct.notes) || []).forEach(function(n){
-    if (n && n.photo && !seen[n.photo]) { seen[n.photo]=1; html += '<img src="'+n.photo+'" style="width:56px;height:56px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)" onclick="showPhotoPreview(this.src)">'; has = true; }
+    if (n && n.photo && !seen[n.photo]) { seen[n.photo]=1; photos.push(n.photo); }
   });
   try {
     (_mCloudConductRows || []).forEach(function(r){
-      if (r && r.full_id === s.fullId && r.photo) { var img = String(r.photo); if (!img || seen[img]) return; seen[img]=1; html += '<img src="'+img+'" style="width:56px;height:56px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border)" onclick="showPhotoPreview(this.src)">'; has = true; }
+      if (r && r.full_id === s.fullId && r.photo) { var img = String(r.photo); if (!img || seen[img]) return; seen[img]=1; photos.push(img); }
     });
   } catch(e){}
-  if (!has) return '';
-  return '<div style="margin-top:8px"><div style="font-size:11px;color:var(--text-3);margin-bottom:4px">📷 收集表图片（点击放大）</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+html+'</div></div>';
+  var pic = '';
+  if (photos.length) {
+    pic = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px"><span style="font-size:11px;color:var(--text-3)">📷 图片：</span>' +
+      photos.map(function(p, i){
+        var lbl = photos.length > 1 ? ('图片' + (i + 1)) : '图片';
+        var src = String(p).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return '<a href="javascript:void(0)" data-photo="'+src+'" onclick="showPhotoPreview(this.getAttribute(\'data-photo\'));return false;" style="font-size:12px;color:var(--primary,var(--accent,#3173f2));text-decoration:underline">'+lbl+'</a>';
+      }).join('') + '</div>';
+  }
+  var note = (s.conduct && s.conduct.note) || '';
+  var safeNote = String(note).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return '<div style="margin-top:8px;padding:8px;background:var(--bg-main,#f5f6f8);border-radius:8px;border:1px solid var(--border-light,#ececf1)">' + pic +
+    '<div style="display:flex;align-items:center;gap:6px"><input type="text" value="'+safeNote+'" placeholder="输入备注…" oninput="mSaveConductNote(\''+s.fullId+'\',this.value)" style="flex:1;min-width:0;font-size:12px;padding:4px 8px;border:1px solid var(--border,#e4e4ea);border-radius:6px;background:#fff;color:var(--text);box-sizing:border-box" /></div>' +
+  '</div>';
+}
+
+// 主表卡片备注：写回该生 s.conduct.note 并本地持久化（沿用 roster 存储）
+function mSaveConductNote(fid, val) {
+  var s = students.find(function(x){ return x.fullId === fid; });
+  if (!s) return;
+  try { s.conduct = s.conduct || {}; s.conduct.note = val; } catch(e){ return; }
+  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(e){}
 }
 
 // 品德操行收集表上传的图片/备注：学生档案中以缩略图展示，点击放大查看

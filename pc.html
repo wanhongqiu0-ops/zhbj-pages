@@ -246,6 +246,11 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .conduct-table .cell-score { cursor: pointer; border-radius: 4px; padding: 4px 8px; display: inline-block; min-width: 40px; }
 .conduct-table .cell-input { width: 52px; text-align: center; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; padding: 3px 2px; font-size: 12px; color: var(--text-1); outline: none; }
 .conduct-table .cell-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+.conduct-table .note-cell { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.conduct-table .note-cell .note-input { width: 100%; max-width: 220px; text-align: left; box-sizing: border-box; }
+.conduct-table .note-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.conduct-table .note-photo-link { font-size: 12px; color: var(--primary); text-decoration: none; cursor: pointer; border: 1px solid var(--primary-light); border-radius: 4px; padding: 1px 8px; background: #fff; }
+.conduct-table .note-photo-link:hover { background: var(--primary-light); }
 .conduct-table .cell-score:hover { background: var(--primary-light); }
 .conduct-table .cell-zero { color: var(--text-3); }
 .conduct-table .cell-add { color: var(--success-dark); font-weight: 600; }
@@ -261,6 +266,8 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
 .kanban-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
 .student-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .student-card { background: #fff; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); cursor: pointer; transition: all 0.15s; position: relative; }
+.student-card.rank-top3 { outline: 2px solid #f5b301; box-shadow: 0 0 10px rgba(245,179,1,.5); }
+.sc-rank { position: absolute; top: 12px; left: 12px; background: #f5b301; color: #fff; font-size: 12px; font-weight: 600; border-radius: 10px; padding: 1px 8px; }
 .student-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 .student-card .sc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .student-card .sc-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; }
@@ -2504,6 +2511,37 @@ function PcConductNotesHtml(s) {
   } catch(e){}
   return parts.join('') || '—';
 }
+// 备注单元格 helper：可手动输入的备注框 + “图片”文字链接（点击打开照片预览弹窗）。累计主表与按周表格共用。
+function PcConductNoteCellHtml(s) {
+  if (!s) return '—';
+  var note = (s.conduct && s.conduct.note) || '';
+  note = String(note).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  var ph = [];
+  var seenImgs = {};
+  function pushImg(img){
+    img = String(img || '');
+    if (!img || seenImgs[img]) return;
+    seenImgs[img] = 1;
+    ph.push(img);
+  }
+  try { ((s.conduct && s.conduct.notes) || []).forEach(function(n){ if (n && n.img) pushImg(n.img); }); } catch(e){}
+  try { (_cloudConductRows || []).filter(function(r){ return r && r.full_id === s.fullId && r.photo; }).forEach(function(r){ pushImg(r.photo); }); } catch(e){}
+  var links = ph.map(function(img, i){
+    var safe = String(img).replace(/'/g, "\\'");
+    return '<a href="javascript:void(0)" class="note-photo-link" onclick="showPhotoPreview(\'' + safe + '\')">' + (ph.length > 1 ? '图片' + (i + 1) : '图片') + '</a>';
+  }).join('');
+  var input = '<input class="cell-input note-input" value="' + note + '" placeholder="备注…" oninput="PcConductNoteEdit(\'' + s.fullId + '\',this)">';
+  return '<div class="note-cell">' + input + (links ? '<div class="note-links">' + links + '</div>' : '') + '</div>';
+}
+// 备注框手动输入：写回该生本地备注并持久化到云端名单
+function PcConductNoteEdit(fid, el) {
+  var s = students.find(function(x){ return x.fullId === fid; });
+  if (!s) return;
+  if (!s.conduct) s.conduct = { d1:0,d2:0,d3:0,d4:0,d5:0,d6:0,d7:0,d8:0,d9:0,d10:0,d11:0,d12:0, notes:[] };
+  s.conduct.note = el.value;
+  try { if (localStorage.getItem(ROSTER_KEY)) localStorage.setItem(ROSTER_KEY, JSON.stringify(students.slice())); } catch(e){}
+  try { if (typeof pushRosterCloud === 'function') pushRosterCloud(); } catch(e){}
+}
 // ================== 品德操行表格 右滑删除（本地隐藏墓碑）+ 恢复 ==================
 var CONDUCT_HIDDEN_KEY = 'smartclass_pc_conduct_hidden';
 function pcConductHidden(){
@@ -2596,7 +2634,7 @@ function initConductTable() {
       ${numCell('d6')}${numCell('d7')}${numCell('d8')}${numCell('d9')}
       ${numCell('d10')}${numCell('d11')}${numCell('d12')}
       <td style="font-weight:700;color:${total>0?'var(--success-dark)':total<0?'var(--danger)':'var(--text-2)'}">${total}</td>
-      <td style="font-size:12px;color:var(--text-3)">${PcConductNotesHtml(s)}</td>
+      <td>${PcConductNoteCellHtml(s)}</td>
       <td><span class="tag ${rankMap[s.id]<=3?'tag-green':rankMap[s.id]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.id]}名</span></td>
     `;
     tbody.appendChild(tr);
@@ -2672,7 +2710,7 @@ function renderConductWeekTable(weekStr) {
       <td style="font-size:12px">${s.dorm}</td>
       ${CONDUCT_ALL_DIMS.map(k => cellInput(k)).join('')}
       <td style="font-weight:700;color:${total>=95?'var(--success-dark)':total>=85?'var(--orange)':'var(--danger)'}" id="wtot-${s.fullId}">${total}</td>
-      <td style="font-size:12px;color:var(--text-3)">${s.conduct.note||'—'}</td>
+      <td>${PcConductNoteCellHtml(s)}</td>
       <td id="wrk-${s.fullId}"><span class="tag ${rankMap[s.fullId]<=3?'tag-green':rankMap[s.fullId]<=10?'tag-blue':'tag-gray'}">第${rankMap[s.fullId]}名</span></td>
     `;
     tbody.appendChild(tr);
@@ -2724,13 +2762,18 @@ function PcConductWeekEdit(fid, dim, el) {
 function initKanbanStudentCards() {
   const grid = document.getElementById('kanbanStudentCards');
   grid.innerHTML = '';
+  // 按看板总分降序排名（选周按周，存全部即各周累计），用于前三名高亮
+  const ranked = [...students].sort((a, b) => pcKanTotal(b) - pcKanTotal(a));
+  const rankMap = {};
+  ranked.forEach((s, i) => rankMap[s.id] = i + 1);
   students.forEach(s => {
     // 看板总分与表格模式“总分”列一致（选周看板随周联动）；维度条也取所选周数值
     const score = pcKanTotal(s);
+    const rank = rankMap[s.id] || students.length;
     const _wk = currentConductWeek();
     const scoreClass = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
-    card.className = 'student-card';
+    card.className = 'student-card' + (rank <= 3 ? ' rank-top3' : '');
     card.onclick = () => showStudentDetail(s);
     // 全部加减分选项：加分维度（绿色，+值）、减分维度（红色，-值）
     const addDims = [
@@ -2752,6 +2795,7 @@ function initKanbanStudentCards() {
     const dims = dedDims.map(d => Object.assign({ type: 'ded' }, d))
       .concat(addDims.map(d => Object.assign({ type: 'add' }, d)));
     card.innerHTML = `
+      ${rank <= 3 ? `<div class="sc-rank">第${rank}名</div>` : ''}
       <div class="sc-score ${scoreClass}">${score}</div>
       <div class="sc-header">
         <div class="sc-avatar" style="background:${s.color}">${s.name[0]}</div>
