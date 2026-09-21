@@ -4251,6 +4251,7 @@ function pcConductKeyFor(label) {
   var l = String(label).trim();
   var m = l.match(/\(d(\d+)\)/);
   if (m) return 'd' + m[1];
+  if (l.indexOf('宿舍') >= 0) return 'd7'; // 表头只写“宿舍/宿舍卫生”时也能识别
   for (var i = 0; i < X_CDIM.length; i++) { if (l.indexOf(X_CDIM[i][1]) >= 0) return X_CDIM[i][0]; }
   return null;
 }
@@ -4320,8 +4321,7 @@ function applyConductTemplate(rows) {
     var sd = snap[s.fullId] || (snap[s.fullId] = { dims: {} });
     Object.keys(colMap).forEach(function(c){
       var v = parseFloat(String(R[c]).replace(/[^\d.\-]/g, ''));
-      if (isNaN(v)) v = 0;
-      v = Math.abs(v);
+      if (isNaN(v)) v = 0; // 保留正负号，总分=各栏相加
       sd.dims[colMap[c]] = v;
       if (!useWeek) s.conduct[colMap[c]] = v; // 仅“未选周”写入累计总表
     });
