@@ -4380,15 +4380,26 @@ function uploadConductTemplate() {
   };
   inp.click();
 }
+function mkConductStudentFromRow(nm, R, idC, dormC) {
+  var idv = (idC >= 0 && R[idC] != null) ? String(R[idC]).trim() : '';
+  if (!idv) idv = 'T' + Date.now() + Math.floor(Math.random() * 999);
+  var conduction = { d1:0,d2:0,d3:0,d4:0,d5:0,d6:0,d7:0,d8:0,d9:0,d10:0,d11:0,d12:0, total:100 };
+  return {
+    id: idv, fullId: idv, name: nm,
+    dorm: (dormC >= 0 && R[dormC] != null) ? String(R[dormC]).trim() : '',
+    gender:'', phone:'', address:'', hasPhoto:false, color:'#1677FF', violations:[], conduct: conduction
+  };
+}
 function applyConductTemplate(rows) {
   if (!rows || !rows.length) return 0;
-  var hr = -1, nameC = -1, dormC = -1, colMap = {};
+  var hr = -1, nameC = -1, idC = -1, dormC = -1, colMap = {};
   for (var r = 0; r < Math.min(rows.length, 8); r++) {
     var row = rows[r] || [];
     for (var c = 0; c < row.length; c++) {
       var t = String(row[c]).trim();
       if (!t) continue;
       if (t.indexOf('姓名') >= 0) { if (nameC < 0) { nameC = c; hr = r; } }
+      else if (t.indexOf('学号') >= 0 && t.indexOf('姓名') < 0) { if (idC < 0) idC = c; }
       else if (t.indexOf('宿舍号') >= 0) { if (dormC < 0) dormC = c; }
       else { var k = pcConductKeyFor(t); if (k && colMap[c] === undefined) colMap[c] = k; }
     }
@@ -4405,7 +4416,12 @@ function applyConductTemplate(rows) {
     var nm = String(R[nameC]).trim();
     if (!nm) continue;
     var s = students.find(function(x){ return x.name === nm; });
-    if (!s) continue;
+    // 名单里没有该生：先尝试用学号/完整号匹配，再按模板行新建，保证上传不被“未导入数据”拦截
+    if (!s && idC >= 0 && R[idC] != null && String(R[idC]).trim() !== '') {
+      var rid = String(R[idC]).trim();
+      s = students.find(function(x){ return x.fullId === rid || String(x.id) === rid; });
+    }
+    if (!s) { s = mkConductStudentFromRow(nm, R, idC, dormC); students.push(s); }
     if (dormC >= 0 && R[dormC] != null && String(R[dormC]).trim() !== '') s.dorm = String(R[dormC]).trim();
     var sd = snap[s.fullId] || (snap[s.fullId] = { dims: {} });
     Object.keys(colMap).forEach(function(c){
