@@ -3279,7 +3279,7 @@ function initConductCards() {
           var key=d[0], lab=d[1], pos=(d[2]==='add');
           var v=valOf(s,key);
           if (readonly) return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><span class="cd-val" style="font-weight:700;color:'+(pos?'var(--success-dark)':'var(--danger)')+'">'+(v||0)+'</span></div>';
-          return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><input id="cdIn_'+s.fullId+'_'+key+'" type="number" class="cd-input" value="'+v+'" min="0" style="'+(pos?'color:var(--success-dark);':'color:var(--danger);')+'" oninput="mAdjustConduct(\''+s.fullId+'\',\''+key+'\',this)"></div>';
+          return '<div class="cci-dim"><span class="cd-label">'+lab+'</span><input id="cdIn_'+s.fullId+'_'+key+'" type="number" class="cd-input" value="'+v+'" min="-999" step="0.5" style="'+(pos?'color:var(--success-dark);':'color:var(--danger);')+'" oninput="mAdjustConduct(\''+s.fullId+'\',\''+key+'\',this)"></div>';
         }).join('')}
         <div class="cci-dim"><span class="cd-label">总分</span><span id="cdScoreDim_${s.fullId}" class="cd-val" style="font-weight:700;color:${score>0?'var(--success-dark)':score<0?'var(--danger)':'var(--text-2)'}">${score}</span></div>
       </div>
@@ -3309,7 +3309,7 @@ function mAdjustConduct(fid, key, el) {
     var tpl = mWeekTpl();
     var wp = tpl[String(_wk)] || (tpl[String(_wk)] = {});
     var sn = wp[s.fullId] || (wp[s.fullId] = { dims: {} });
-    sn.dims[key] = Math.abs(v);
+    sn.dims[key] = v; // 每个项目保留正负号，总分=各栏算术相加
     mSaveWeekTpl();
     try { if (typeof pushMWeekTplCloud === 'function') pushMWeekTplCloud(); } catch(e){}
     var score = mWeekTotal(s, String(_wk));
@@ -3320,7 +3320,7 @@ function mAdjustConduct(fid, key, el) {
     if (dime) { dime.textContent = score; dime.style.color = score > 0 ? 'var(--success-dark)' : score < 0 ? 'var(--danger)' : 'var(--text-2)'; }
     return;
   }
-  s.conduct[key] = Math.abs(v); // 加分/减分均按数值存，正负由维度类型决定
+  s.conduct[key] = v; // 每个项目保留正负号，正负由输入值决定
   var score = mConductNet(s);
   var sc = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
   var top = document.getElementById('cdScoreTop_' + fid);

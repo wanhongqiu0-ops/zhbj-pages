@@ -2657,7 +2657,7 @@ function renderConductWeekTable(weekStr) {
     var v = function(k){ return cm[k] || 0; };
     var total = weekTotalMap[s.fullId];
     var tr = document.createElement('tr');
-    var cellInput = function(k){ var val = v(k); var col = isAdd(k) ? 'var(--success-dark)' : 'var(--danger)'; return '<td><input type="number" class="cell-input" min="0" value="'+val+'" data-wk="' + weekStr + '" style="color:'+col+'" oninput="PcConductWeekEdit(\''+s.fullId+'\',\''+k+'\',this)"></td>'; };
+    var cellInput = function(k){ var val = v(k); var col = isAdd(k) ? 'var(--success-dark)' : 'var(--danger)'; return '<td><input type="number" class="cell-input" min="-999" step="0.5" value="'+val+'" data-wk="' + weekStr + '" style="color:'+col+'" oninput="PcConductWeekEdit(\''+s.fullId+'\',\''+k+'\',this)"></td>'; };
     tr.innerHTML = `
       <td><span class="st-avatar-sm" style="background:${s.color}">${s.name[0]}</span> <span style="font-size:12px;color:var(--text-3)">${s.id}</span> ${s.name}</td>
       <td style="font-size:12px">${s.dorm}</td>
@@ -2687,7 +2687,7 @@ function PcConductWeekEdit(fid, dim, el) {
   var s = students.find(function(x){ return x.fullId === fid; });
   if (!s) return;
   var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
-  if (isNaN(v)) v = 0; v = Math.abs(v);
+  if (isNaN(v)) v = 0; // 每个项目保留正负号，总分即各栏算术相加
   var tpl = loadWeekTpl();
   var wk = tpl[String(week)] || (tpl[String(week)] = {});
   var sn = wk[fid] || (wk[fid] = { dims: {} });
