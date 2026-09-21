@@ -2349,6 +2349,9 @@ function mAllWeekTotal(s) {
   MC_ALL.forEach(function(k){ sum += mAllWeekDim(s, k); }); // 各栏（正负号）求和
   return sum;
 }
+// 看板取值：选周返回该周；未选周(累计)返回 1~21 周各周之和（与主表“全部（累计）”同源）
+function mKanTotal(s){ var wk = mCurrentWeek(); return wk ? mWeekTotal(s, wk) : mAllWeekTotal(s); }
+function mKanDim(s, k){ var wk = mCurrentWeek(); return wk ? mWeekDimVal(s, wk, k) : mAllWeekDim(s, k); }
 function mWeekMatrix(wk){
   var m = {};
   function add(fid, dm, sc){
@@ -3366,13 +3369,12 @@ function initMCharts() {
   if (mDeductChartInstance) mDeductChartInstance.dispose();
   mDeductChartInstance = echarts.init(chartDom);
   const dims = ['班级卫生','宿舍/手机','晚修纪律','课堂/作业','出勤/仪容'];
-  const _wkd = mCurrentWeek();
   const data = [
-    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d6'),0),
-    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d7'),0),
-    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d8'),0),
-    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d9'),0),
-    students.reduce((s,st)=>s+mWeekDimVal(st,_wkd,'d11'),0),
+    students.reduce((s,st)=>s+mKanDim(st,'d6'),0),
+    students.reduce((s,st)=>s+mKanDim(st,'d7'),0),
+    students.reduce((s,st)=>s+mKanDim(st,'d8'),0),
+    students.reduce((s,st)=>s+mKanDim(st,'d9'),0),
+    students.reduce((s,st)=>s+mKanDim(st,'d11'),0),
   ];
   mDeductChartInstance.setOption({
     tooltip: { trigger: 'axis', formatter: '{b}: 扣{c}分' },
@@ -3390,7 +3392,6 @@ function initMCharts() {
   const hg = document.getElementById('mHeatGrid');
   hg.innerHTML = '';
   // 宿舍按“宿舍号前3位数字”分组（如 504-3 → 504），卡片分数=该宿舍学生总分之和；看板随所选周联动
-  const _mwk = mCurrentWeek();
   const dorms = {};
   students.forEach(s => {
     const m = String(s.dorm || '').trim().match(/^(\d+)/);
@@ -3399,7 +3400,7 @@ function initMCharts() {
     dorms[key].members.push(s);
   });
   Object.values(dorms).forEach(d => {
-    const total = d.members.reduce(function(acc, s){ return acc + (typeof mWeekTotal === 'function' ? (mWeekTotal(s, _mwk)||0) : 0); }, 0);
+    const total = d.members.reduce(function(acc, s){ return acc + (mKanTotal(s)||0); }, 0);
     const card = document.createElement('div');
     card.className = 'heat-card';
     card.innerHTML = `<div class="hc-title">宿舍 ${d.name}</div><div class="hc-score">${Number(total).toFixed(1)}</div><div class="hc-detail">${d.members.length}人 · 总分 ${Number(total).toFixed(1)}</div>`;
@@ -3428,10 +3429,8 @@ function initMKanbanCards() {
   const grid = document.getElementById('mKanbanStudentCards');
   if (!grid) return;
   grid.innerHTML = '';
-  const _wk = mCurrentWeek();
-  const readonly = !_wk;
-  const totalOf = (s) => readonly ? mAllWeekTotal(s) : mWeekTotal(s, _wk);
-  const dimOf = (s, k) => readonly ? mAllWeekDim(s, k) : mWeekDimVal(s, _wk, k);
+  const totalOf = (s) => mKanTotal(s);
+  const dimOf = (s, k) => mKanDim(s, k);
   const dims = [
     { label: '班级卫生', key: 'd6', pos: false },
     { label: '宿舍/手机', key: 'd7', pos: false },

@@ -2428,6 +2428,9 @@ function pcAllWeekTotal(s) {
   CONDUCT_ALL_DIMS.forEach(function(k){ sum += pcAllWeekDim(s, k); }); // 各栏（正负号）求和
   return sum;
 }
+// 看板取值：选周→按周数值，全部（累计）→与主表一致的各周之和；避免与累计口径不一致
+function pcKanTotal(s){ var wk = currentConductWeek(); return wk ? pcWeekTotal(s, wk) : pcAllWeekTotal(s); }
+function pcKanDim(s, k){ var wk = currentConductWeek(); return wk ? pcWeekDimVal(s, wk, k) : pcAllWeekDim(s, k); }
 // 某学生某周某个维度的数值：选周时取“该周模板快照优先，否则当周收集记录”；未选周(累计)取累计 s.conduct[k]
 function pcWeekDimVal(s, wk, k) {
   if (!wk) return (s.conduct[k] || 0);
@@ -2723,7 +2726,7 @@ function initKanbanStudentCards() {
   grid.innerHTML = '';
   students.forEach(s => {
     // 看板总分与表格模式“总分”列一致（选周看板随周联动）；维度条也取所选周数值
-    const score = pcWeekTotal(s, currentConductWeek());
+    const score = pcKanTotal(s);
     const _wk = currentConductWeek();
     const scoreClass = score > 0 ? 'good' : score < 0 ? 'bad' : 'warn';
     const card = document.createElement('div');
@@ -2759,7 +2762,7 @@ function initKanbanStudentCards() {
       </div>
       <div class="sc-dims">
       ${dims.map(d => {
-        const dv = pcWeekDimVal(s, _wk, d.key) || 0;
+        const dv = pcKanDim(s, d.key) || 0;
         const isAdd = d.type === 'add';
         const col = dv >= 0 ? 'var(--success-dark)' : 'var(--danger)';
         const shown = (dv >= 0 ? '+' : '') + dv;
@@ -2790,7 +2793,7 @@ function initHeatmap() {
     dorms[key].students.push(s);
   });
   Object.values(dorms).forEach(d => {
-    const total = d.students.reduce((sum, s) => sum + pcWeekTotal(s, wk), 0);
+    const total = d.students.reduce((sum, s) => sum + pcKanTotal(s), 0);
     const card = document.createElement('div');
     card.className = 'heat-card';
     card.innerHTML = `
@@ -2811,11 +2814,11 @@ function initDeductChart() {
   const dims = ['班级卫生', '宿舍/手机', '晚修纪律', '课堂/作业', '出勤/仪容'];
   const _wk = currentConductWeek();
   const data = [
-    students.reduce((s, st) => s + pcWeekDimVal(st, _wk, 'd6'), 0),
-    students.reduce((s, st) => s + pcWeekDimVal(st, _wk, 'd7'), 0),
-    students.reduce((s, st) => s + pcWeekDimVal(st, _wk, 'd8'), 0),
-    students.reduce((s, st) => s + pcWeekDimVal(st, _wk, 'd9'), 0),
-    students.reduce((s, st) => s + pcWeekDimVal(st, _wk, 'd11'), 0),
+    students.reduce((s, st) => s + pcKanDim(st, 'd6'), 0),
+    students.reduce((s, st) => s + pcKanDim(st, 'd7'), 0),
+    students.reduce((s, st) => s + pcKanDim(st, 'd8'), 0),
+    students.reduce((s, st) => s + pcKanDim(st, 'd9'), 0),
+    students.reduce((s, st) => s + pcKanDim(st, 'd11'), 0),
   ];
   deductChartInstance.setOption({
     tooltip: { trigger: 'axis', formatter: '{b}: 扣{c}分' },
