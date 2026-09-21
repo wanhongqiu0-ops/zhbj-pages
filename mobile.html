@@ -3456,8 +3456,8 @@ function initMKanbanCards() {
       </div>
       ${dims.map(d => {
         const v = dimOf(s, d.key);
-        const color = d.pos ? (v > 0 ? 'var(--success-dark)' : 'var(--text-3)') : (v > 0 ? 'var(--danger)' : 'var(--text-3)');
-        const show = (d.pos ? (v > 0 ? '+' + v : '0') : (v > 0 ? '-' + v : '0'));
+        const color = v >= 0 ? 'var(--success-dark)' : 'var(--danger)';
+        const show = (v >= 0 ? '+' : '') + v;
         return `<div class="mk-dim"><span>${d.label}</span><span class="mk-dv" style="color:${color}">${show}</span></div>`;
       }).join('')}
     `;

@@ -2646,9 +2646,10 @@ function renderConductWeekTable(weekStr) {
     var sn = snWeek[s.fullId];
     if (sn && sn.dims) { Object.keys(sn.dims).forEach(function(k){ cm[k] = sn.dims[k]; }); }
     eff[s.fullId] = cm;
-    var addSum = 0, dedSum = 0;
-    CONDUCT_ALL_DIMS.forEach(function(k){ if(!cm[k]) return; if(isAdd(k)) addSum += cm[k]; else dedSum += cm[k]; });
-    weekTotalMap[s.fullId] = addSum - dedSum;
+    var sum = 0;
+    // 按周总分 = 各栏（带正负号）直接相加；维度值已为正/负，不再按维度类型加减
+    CONDUCT_ALL_DIMS.forEach(function(k){ sum += cm[k] || 0; });
+    weekTotalMap[s.fullId] = sum;
   });
 
   // 排序与排名（基于周总分）
@@ -2760,15 +2761,15 @@ function initKanbanStudentCards() {
       ${dims.map(d => {
         const dv = pcWeekDimVal(s, _wk, d.key) || 0;
         const isAdd = d.type === 'add';
-        const col = dv > 0 ? (isAdd ? 'var(--success-dark)' : 'var(--danger)') : 'var(--text-3)';
-        const sign = isAdd ? '+' : '-';
-        const shown = dv > 0 ? sign + dv : '0';
+        const col = dv >= 0 ? 'var(--success-dark)' : 'var(--danger)';
+        const shown = (dv >= 0 ? '+' : '') + dv;
+        const pct = Math.max(0, Math.min(100, (Math.abs(dv) / d.max) * 100));
         return `
         <div class="sc-item">
           <span class="sc-label">${d.label}</span>
           <span class="sc-val" style="color:${col}">${shown}</span>
         </div>
-        <div class="progress-bar"><div class="fill" style="width:${(dv/d.max)*100}%;background:${d.color || (isAdd ? 'var(--success-dark)' : '#FF4D4F')}"></div></div>
+        <div class="progress-bar"><div class="fill" style="width:${pct}%;background:${d.color || 'var(--success-dark)'}"></div></div>
       `;}).join('')}
       </div>
     `;
