@@ -2289,6 +2289,19 @@ function mConductNet(s) {
   MC_ALL.forEach(function(k){ sum += (+s.conduct[k] || 0); }); // 带符号直接相加：加分正、减分负
   return sum;
 }
+// ===== 同宿舍同色：宿舍号前3位为组 key，确定性哈希从色板取色，不改 s.color 原始数据 =====
+var M_DORM_PALETTE = ['#1677FF','#52C41A','#722ED1','#FA8C16','#EB2F96','#13C2C2','#F5222D','#2F54EB','#A0D911','#0050B3','#FADB14','#C41D7F'];
+function mDormColor(s){
+  try {
+    var d = (s && s.dorm != null) ? String(s.dorm).trim() : '';
+    var key = d;
+    if (d) { var m = d.match(/^\d+/); if (m) key = m[0].slice(0,3); } // 截前3位数字
+    if (!key) return (s && s.color) ? s.color : '#9E9E9E'; // 空回退原色/灰
+    var h = 0;
+    for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return M_DORM_PALETTE[h % M_DORM_PALETTE.length];
+  } catch(e){ return (s && s.color) ? s.color : '#9E9E9E'; }
+}
 // ===== 云端操行记录（保留原始行便于按周取数）+ 按周模板快照（与 PC 端共享）=====
 var _mCloudConductRows = [];
 var _mWeekTpl = null;
@@ -2356,6 +2369,9 @@ function mAllWeekTotal(s) {
 // 看板取值：选周返回该周；未选周(累计)返回 1~21 周各周之和（与主表“全部（累计）”同源）
 function mKanTotal(s){ var wk = mCurrentWeek(); return wk ? mWeekTotal(s, wk) : mAllWeekTotal(s); }
 function mKanDim(s, k){ var wk = mCurrentWeek(); return wk ? mWeekDimVal(s, wk, k) : mAllWeekDim(s, k); }
+// 统一“当前总分源”：未选周(全部)=各周之和(mAllWeekTotal)，选周=当周(mWeekTotal)，与主表/看板全部一致
+function mTotalOf(s){ var wk = mCurrentWeek(); return wk ? mWeekTotal(s, wk) : mAllWeekTotal(s); }
+function mDimOf(s, k){ var wk = mCurrentWeek(); return wk ? mWeekDimVal(s, wk, k) : mAllWeekDim(s, k); }
 function mWeekMatrix(wk){
   var m = {};
   function add(fid, dm, sc){
@@ -3144,7 +3160,7 @@ function initMAttendance() {
     btn.className = 'att-btn unchecked';
     btn.dataset.id = s.id;
     btn.innerHTML = `
-      <div class="att-avatar" style="background:${s.color}">${s.name[0]}</div>
+      <div class="att-avatar" style="background:${mDormColor(s)}">${s.name[0]}</div>
       <div class="att-text">
         <div class="att-id">${s.id}</div>
         <div class="att-name">${s.name}</div>
@@ -3281,7 +3297,7 @@ function initConductCards() {
     card.className = 'conduct-card-item';
     card.innerHTML = `
       <div class="cci-header">
-        <div class="cci-avatar" style="background:${s.color}">${s.name[0]}</div>
+        <div class="cci-avatar" style="background:${mDormColor(s)}">${s.name[0]}</div>
         <div>
           <div class="cci-name">${s.name}</div>
           <div class="cci-id">${s.id} · ${s.dorm}</div>
@@ -3531,7 +3547,7 @@ function initMKanbanCards() {
     card.innerHTML = `
       <div class="mk-score ${sc}">${score}</div>
       <div class="mk-head">
-        <div class="mk-avatar" style="background:${s.color}">${s.name[0]}</div>
+        <div class="mk-avatar" style="background:${mDormColor(s)}">${s.name[0]}</div>
         <div>
           <div class="mk-name">${s.name}</div>
           <div class="mk-id">${s.id} · ${s.dorm}</div>
@@ -3561,8 +3577,8 @@ function initMStudentTable() {
     tr.onclick = () => selectMStudent(s, tr);
     tr.innerHTML = `
       <td>${s.hasPhoto
-        ? `<img class="st-photo-sm" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" style="width:24px;height:24px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'" /><span class="st-avatar-sm" style="background:${s.color};display:none">${s.name[0]}</span>`
-        : `<span class="st-avatar-sm" style="background:${s.color}">${s.name[0]}</span>`
+        ? `<img class="st-photo-sm" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" style="width:24px;height:24px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'" /><span class="st-avatar-sm" style="background:${mDormColor(s)};display:none">${s.name[0]}</span>`
+        : `<span class="st-avatar-sm" style="background:${mDormColor(s)}">${s.name[0]}</span>`
       }</td>
       <td>${s.fullId}</td>
       <td>${s.name}</td>
@@ -3585,8 +3601,8 @@ function selectMStudent(s, tr) {
   panel.innerHTML = `
     <div class="st-profile-photo">
       ${s.hasPhoto
-        ? `<img class="big-photo" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="big-avatar" style="background:${s.color};display:none">${s.name[0]}</div>`
-        : `<div class="big-avatar" style="background:${s.color}">${s.name[0]}</div>`
+        ? `<img class="big-photo" src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20student%20portrait%20headshot%20neutral%20background&image_size=square" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="big-avatar" style="background:${mDormColor(s)};display:none">${s.name[0]}</div>`
+        : `<div class="big-avatar" style="background:${mDormColor(s)}">${s.name[0]}</div>`
       }
     </div>
     <div class="st-profile-info">
@@ -3595,7 +3611,7 @@ function selectMStudent(s, tr) {
       <div class="st-profile-row"><span class="pr-label">宿舍号</span><span class="pr-value">${s.dorm}</span></div>
       <div class="st-profile-row"><span class="pr-label">家长电话</span><span class="pr-value">${s.phone}</span></div>
       <div class="st-profile-row"><span class="pr-label">家庭住址</span><span class="pr-value">${s.address}</span></div>
-      <div class="st-profile-row"><span class="pr-label">本周操行分</span><span class="pr-value" style="color:${mConductNet(s)>0?'var(--success-dark)':mConductNet(s)<0?'var(--danger)':'var(--text-2)'}">${mConductNet(s)}分</span></div>
+      <div class="st-profile-row"><span class="pr-label">操行分</span><span class="pr-value" style="color:${mTotalOf(s)>0?'var(--success-dark)':mTotalOf(s)<0?'var(--danger)':'var(--text-2)'}">${mTotalOf(s)}分</span></div>
       <div class="st-profile-row"><span class="pr-label">违纪记录</span><span class="pr-value">${viCount>0?'<span class="tag tag-red">'+viCount+'条</span>':'<span class="tag tag-gray">0条</span>'}</span></div>
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" style="flex:1" onclick="showPhotoUploadModal()">${s.hasPhoto?'更换照片':'上传照片'}</button>
@@ -3687,7 +3703,7 @@ let bsTrendChart = null;
 function showStudentDetail(s) {
   currentStudentId = students.indexOf(s);
   document.getElementById('bsAvatar').textContent = s.name[0];
-  document.getElementById('bsAvatar').style.background = s.color;
+  document.getElementById('bsAvatar').style.background = mDormColor(s);
   document.getElementById('bsName').textContent = s.name;
   document.getElementById('bsId').textContent = s.fullId + ' · ' + s.gender + ' · 宿舍' + s.dorm;
   document.getElementById('bsFullId').textContent = s.fullId;
@@ -3695,7 +3711,7 @@ function showStudentDetail(s) {
   document.getElementById('bsDorm').textContent = s.dorm;
   document.getElementById('bsPhone').textContent = s.phone;
   document.getElementById('bsAddress').textContent = s.address;
-  document.getElementById('bsScore').textContent = s.conduct.total + '分';
+  document.getElementById('bsScore').textContent = mTotalOf(s) + '分';
   const bsScores = document.getElementById('mBsScoreSection');
   if (bsScores) bsScores.innerHTML = mStudentScoresHtml(s);
   // Render violations
@@ -3731,7 +3747,7 @@ function showStudentDetail(s) {
       tooltip: { trigger: 'axis' },
       xAxis: { type:'category', data: weeks, axisLabel: { fontSize: 10 } },
       yAxis: { type:'value', min: 75, max: 105, axisLabel: { fontSize: 10 } },
-      series: [{ type:'line', data:[96,94,98,95,s.conduct.total], smooth:true, areaStyle:{ color:'rgba(22,119,255,0.1)' }, lineStyle:{ color:'#1677FF', width:2 }, itemStyle:{ color:'#1677FF' }, markLine:{ data:[{ yAxis:85, lineStyle:{ color:'#FF4D4F', type:'dashed' } }], silent:true } }],
+      series: [{ type:'line', data:[96,94,98,95,mTotalOf(s)], smooth:true, areaStyle:{ color:'rgba(22,119,255,0.1)' }, lineStyle:{ color:'#1677FF', width:2 }, itemStyle:{ color:'#1677FF' }, markLine:{ data:[{ yAxis:85, lineStyle:{ color:'#FF4D4F', type:'dashed' } }], silent:true } }],
       grid: { left: 30, right: 10, top: 15, bottom: 20 }
     });
   }, 200);
@@ -4510,7 +4526,7 @@ function mExportConductPick() {
 function mExportConductXlsx(week) {
   var headers = ['学号', '姓名', '寝室'].concat(M_EXPORT_DIMS.map(function(d) { return ccDimNames[d]; })).concat(['总分']);
   var aoa = students.map(function(s) {
-    return [s.fullId, s.name, s.dorm].concat(M_EXPORT_DIMS.map(function(d) { return s.conduct[d] || 0; })).concat([mConductNet(s)]);
+    return [s.fullId, s.name, s.dorm].concat(M_EXPORT_DIMS.map(function(d) { return s.conduct[d] || 0; })).concat([mTotalOf(s)]);
   });
   mExportSheet('操行报表_第' + week + '周_' + mExportTs(), headers, aoa);
 }
@@ -4530,7 +4546,7 @@ function mExportArchiveXlsx(sel) {
   var arr = (sel && sel !== 'all') ? students.filter(function(s){ return s.fullId === sel; }) : students;
   var headers = ['学号', '姓名', '寝室', '性别', '电话', '住址', '违纪次数', '操行总分', '照片'];
   var aoa = arr.map(function(s) {
-    return [s.fullId, s.name, s.dorm, s.gender, s.phone, s.address, (s.violations||[]).length, mConductNet(s), s.hasPhoto ? '有' : '无'];
+    return [s.fullId, s.name, s.dorm, s.gender, s.phone, s.address, (s.violations||[]).length, mTotalOf(s), s.hasPhoto ? '有' : '无'];
   });
   var fn = (sel && sel !== 'all') ? '学生档案_' + (arr[0] ? arr[0].name : '') + '_' : '学生档案_全体_';
   mExportSheet(fn + mExportTs(), headers, aoa);

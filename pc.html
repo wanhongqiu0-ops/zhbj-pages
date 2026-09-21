@@ -2640,6 +2640,17 @@ function clearConductData() {
   } catch(e){}
   try { showToast('已清空品德操行数据'); } catch(e){}
 }
+// 同一宿舍的学生标签同色：宿舍组 key = 宿舍号前3位数字（如 504-3→504）；无数字取宿舍号原值；空取'其他'
+var PC_DORM_PALETTE = ['#5B8FF9','#61DDB7','#F6903D','#F08BB4','#9270CA','#5AD8A7','#FF9845','#6DC8EC','#E8684A','#82C6CC','#CBD3D7','#B37FEB'];
+function pcDormColor(s) {
+  var d = String((s && s.dorm) || '').trim();
+  if (!d) return (s && s.color) || '#8C8C8C'; // 宿舍为空回退到原 s.color 或默认灰
+  var m = d.match(/^\d+/);
+  var key = m ? m[0].slice(0,3) : d;
+  var h = 0;
+  for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return PC_DORM_PALETTE[h % PC_DORM_PALETTE.length];
+}
 function initConductTable() {
   // “全部（累计）”：只读展示各周填入数据的合计（周模板快照 + 各周收集记录），不提供手动录入
   const tbody = document.getElementById('conductTableBody');
@@ -2650,10 +2661,10 @@ function initConductTable() {
   const rankMap = {};
   sorted.forEach((s, i) => rankMap[s.id] = i + 1);
 
-  sorted.forEach((s) => {
+  students.forEach((s) => {
     if (pcIsConductHidden(s.fullId)) return;
     const tr = document.createElement('tr');
-    const avatarColor = s.color;
+    const avatarColor = pcDormColor(s);
     const numCell = dim => { const v = pcAllWeekDim(s, dim); const col = isAdd(dim)?'var(--success-dark)':'var(--danger)'; return '<td style="font-weight:600;color:'+col+'">'+(v||0)+'</td>'; };
     const total = pcAllWeekTotal(s);
     tr.innerHTML = `
@@ -2731,7 +2742,7 @@ function renderConductWeekTable(weekStr) {
   var rankMap = {}; sorted.forEach(function(s, i){ rankMap[s.fullId] = i + 1; });
 
   tbody.innerHTML = '';
-  sorted.forEach(function(s){
+  students.forEach(function(s){
     if (pcIsConductHidden(s.fullId)) return;
     var cm = eff[s.fullId] || {};
     var v = function(k){ return cm[k] || 0; };
@@ -2739,7 +2750,7 @@ function renderConductWeekTable(weekStr) {
     var tr = document.createElement('tr');
     var cellInput = function(k){ var val = v(k); var col = isAdd(k) ? 'var(--success-dark)' : 'var(--danger)'; return '<td><input type="number" class="cell-input" min="-999" step="0.5" value="'+val+'" data-wk="' + weekStr + '" style="color:'+col+'" oninput="PcConductWeekEdit(\''+s.fullId+'\',\''+k+'\',this)"></td>'; };
     tr.innerHTML = `
-      <td><span class="st-avatar-sm" style="background:${s.color}">${s.name[0]}</span> <span style="font-size:12px;color:var(--text-3)">${s.id}</span> ${s.name}</td>
+      <td><span class="st-avatar-sm" style="background:${pcDormColor(s)}">${s.name[0]}</span> <span style="font-size:12px;color:var(--text-3)">${s.id}</span> ${s.name}</td>
       <td style="font-size:12px">${s.dorm}</td>
       ${CONDUCT_ALL_DIMS.map(k => cellInput(k)).join('')}
       <td style="font-weight:700;color:${total>=95?'var(--success-dark)':total>=85?'var(--orange)':'var(--danger)'}" id="wtot-${s.fullId}">${total}</td>
@@ -2775,14 +2786,17 @@ function PcConductWeekEdit(fid, dim, el) {
   saveWeekTpl(tpl);
   try { if (typeof pushWeekTplCloud==='function') pushWeekTplCloud(); } catch(e){}
   var wkS = String(week);
-  var total = pcWeekTotal(s, wkS);
-  var totEl = document.getElementById('wtot-' + fid);
-  if (totEl) totEl.textContent = total;
-  var sorted = [...students].sort(function(a,b){ return pcWeekTotal(b, wkS) - pcWeekTotal(a, wkS); });
+  // 实时同步：重算全部学生周总分并统一排名，批量刷新每一行的总分列(wtot)与名次徽章(wrk)；行序=名单序不变
+  var totals = {}; students.forEach(function(x){ totals[x.fullId] = pcWeekTotal(x, wkS); });
+  var sorted = [...students].sort(function(a,b){ return totals[b.fullId] - totals[a.fullId]; });
   var rankMap = {}; sorted.forEach(function(x,i){ rankMap[x.fullId] = i + 1; });
-  var r = rankMap[fid] || students.length;
-  var rkEl = document.getElementById('wrk-' + fid);
-  if (rkEl) rkEl.innerHTML = '<span class="tag '+(r<=3?'tag-green':r<=10?'tag-blue':'tag-gray')+'">第'+r+'名</span>';
+  students.forEach(function(x){
+    var totEl = document.getElementById('wtot-' + x.fullId);
+    if (totEl) totEl.textContent = totals[x.fullId];
+    var r = rankMap[x.fullId] || students.length;
+    var rkEl = document.getElementById('wrk-' + x.fullId);
+    if (rkEl) rkEl.innerHTML = '<span class="tag '+(r<=3?'tag-green':r<=10?'tag-blue':'tag-gray')+'">第'+r+'名</span>';
+  });
   CONDUCT_ALL_DIMS.forEach(function(k){
     var aEl = document.getElementById('avg-'+k);
     if (aEl) { var sum = students.reduce(function(a,x){ return a + pcWeekDimVal(x, wkS, k); }, 0); aEl.textContent = (sum/students.length).toFixed(1); }
@@ -2831,7 +2845,7 @@ function initKanbanStudentCards() {
       ${rank <= 3 ? `<div class="sc-rank">第${rank}名</div>` : ''}
       <div class="sc-score ${scoreClass}">${score}</div>
       <div class="sc-header">
-        <div class="sc-avatar" style="background:${s.color}">${s.name[0]}</div>
+        <div class="sc-avatar" style="background:${pcDormColor(s)}">${s.name[0]}</div>
         <div>
           <div class="sc-name">${s.name}</div>
           <div class="sc-id">${s.id} · ${s.dorm}</div>

@@ -1,5 +1,5 @@
 // 智慧班级管家 Service Worker：离线缓存 + 安装
-const CACHE = 'zhbj-v40';
+const CACHE = 'zhbj-v41';
 const CORE = [
   './',
   './index.html',
