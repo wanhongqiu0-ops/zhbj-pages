@@ -1716,7 +1716,7 @@ for (let i = 0; i < 58; i++) {
     }
   });
 }
-// calculate total: base 100 + adds(d1-d5,d10) - deducts(d6-d9,d11)
+// calculate total: base 100 + 12 个维度（正负号）算术相加
 var SB_URL_KEY = 'smartclass_supabase_url';
 var SB_ANON_KEY = 'smartclass_supabase_anon';
 // 名单加载 / 首页悬停删除 / 净分计算：用 try/catch 隔离，避免任一早期失败中断导航绑定等后续初始化
@@ -1726,9 +1726,8 @@ students.forEach(s => {
   if (!s || typeof s !== 'object') return;                 // 容错：跳过非法项
   if (!Array.isArray(s.violations)) s.violations = [];     // 名单上传的学生缺 violations，统一补空数组
   if (!s.conduct) s.conduct = { d1:0,d2:0,d3:0,d4:0,d5:0,d6:0,d7:0,d8:0,d9:0,d10:0,d11:0,d12:0, notes:[] }; // 补默认，防止名单缺 conduct 崩溃
-  const adds = s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10;
-  const deducts = s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11 + s.conduct.d12;
-  s.conduct.total = 100 + adds - deducts;
+  // 总分 = 100 + 各栏（正负号）算术相加
+  s.conduct.total = 100 + s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d10 + s.conduct.d11 + s.conduct.d12;
 });
 
 // ================== Supabase 云端同步层（真正跨设备数据回传）==================
@@ -1874,7 +1873,7 @@ function applyCloudRecords() {
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-      s.conduct[r.dim] += r.score;
+      s.conduct[r.dim] += (r.score_type === '加分' ? +r.score : -r.score);
       s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
     });
     try { renderCurrentConductView(); if (typeof initKanbanCharts==='function') initKanbanCharts(); } catch(e){}
@@ -1886,10 +1885,10 @@ function applyCloudRecords() {
       if (!s) return;
       s.violations.unshift({ type: r.vtype, desc: r.description, score: -r.score, isBonus: false, date: r.vdate, photo: r.photo });
       s.conduct.total -= r.score;
-      s.conduct.d12 += r.score; // 云端违纪扣分关联到“违纪”列
-      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 += r.score;
-      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
-      else s.conduct.d9 += r.score;
+      s.conduct.d12 -= r.score; // 云端违纪扣分关联到“违纪”列（带符号存储）
+      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 -= r.score;
+      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 -= r.score;
+      else s.conduct.d9 -= r.score;
     });
     try { initStudentTable(); } catch(e){}
   });
@@ -2067,7 +2066,7 @@ function applySharedCollectRecords() {
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r) {
     var s = students.find(function(x){ return x.fullId === r.fullId; });
     if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-    s.conduct[r.dim] += r.score;
+    s.conduct[r.dim] += (r.scoreType === '加分' ? +r.score : -r.score);
     s.conduct.total += (r.scoreType === '加分' ? r.score : -r.score);
     if (r && (r.note || r.desc || r.photo)) { if (!s.conduct.notes) s.conduct.notes = []; s.conduct.notes.push({ date: (r.date||r.week||''), text: (r.note||r.desc||''), img: (r.photo||'') }); }
   });
@@ -2080,9 +2079,9 @@ function applySharedCollectRecords() {
       date: r.date.indexOf('-') !== -1 ? r.date : r.date, photo: r.photo
     });
     s.conduct.total -= r.score;
-    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 += r.score;
-    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
-    else s.conduct.d9 += r.score;
+    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 -= r.score;
+    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 -= r.score;
+    else s.conduct.d9 -= r.score;
   });
 }
 try { applySharedCollectRecords(); } catch(err) { console.error('applySharedCollectRecords', err); }
@@ -2393,8 +2392,9 @@ function resetAttendance() {
 // ========== Conduct Table ==========
 // 累计总分 = 各维度净汇总（d1-d5,d10 加分 减  d6-d9,d11,d12 减分），不再叠加100分制
 function netConductTotal(s) {
-  return (s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10) -
-         (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11 + s.conduct.d12);
+  var sum = 0;
+  CONDUCT_ALL_DIMS.forEach(function(k){ sum += (+s.conduct[k] || 0); }); // 各栏（正负号）算术相加
+  return sum;
 }
 // ===== 按周模板快照：上传模板按所选周归档，周视图/看板按周取数（本地 + 云端共享） =====
 var WKTPL_KEY = 'smartclass_conduct_weektpl';
@@ -4331,7 +4331,7 @@ function applyConductTemplate(rows) {
       if (!useWeek) s.conduct[colMap[c]] = v; // 仅“未选周”写入累计总表
     });
     if (!useWeek) {
-      s.conduct.total = 100 + (s.conduct.d1+s.conduct.d2+s.conduct.d3+s.conduct.d4+s.conduct.d5+s.conduct.d10) - (s.conduct.d6+s.conduct.d7+s.conduct.d8+s.conduct.d9+s.conduct.d11+s.conduct.d12);
+      s.conduct.total = 100 + s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d10 + s.conduct.d11 + s.conduct.d12;
     }
     applied++;
   }

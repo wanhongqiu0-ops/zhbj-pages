@@ -2260,29 +2260,30 @@ for (let i = 0; i < 58; i++) {
       d3: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
       d4: Math.random()>0.7 ? Math.floor(Math.random()*3)+1 : 0,
       d5: Math.random()>0.85 ? Math.floor(Math.random()*2)+1 : 0,
-      d6: Math.random()>0.5 ? Math.floor(Math.random()*4) : 0,
-      d7: Math.random()>0.5 ? Math.floor(Math.random()*5) : 0,
-      d8: Math.random()>0.6 ? Math.floor(Math.random()*4) : 0,
-      d9: Math.random()>0.5 ? Math.floor(Math.random()*5) : 0,
+      d6: -(Math.random()>0.5 ? Math.floor(Math.random()*4) : 0),
+      d7: -(Math.random()>0.5 ? Math.floor(Math.random()*5) : 0),
+      d8: -(Math.random()>0.6 ? Math.floor(Math.random()*4) : 0),
+      d9: -(Math.random()>0.5 ? Math.floor(Math.random()*5) : 0),
       d10: Math.random()>0.85 ? Math.floor(Math.random()*3)+1 : 0,
-      d11: Math.random()>0.6 ? Math.floor(Math.random()*3) : 0,
+      d11: -(Math.random()>0.6 ? Math.floor(Math.random()*3) : 0),
       d12: 0,
       note: Math.random()>0.8 ? '表现良好' : '',
     }
   });
 }
 students.forEach(s => {
-  const adds = s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10;
-  const deducts = s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11;
-  s.conduct.total = 100 + adds - deducts;
+  // 带符号直接相加：加分维度(d1-d5,d10)为正，减分维度(d6-d9,d11,d12)为负，总分=100+各栏之和
+  s.conduct.total = 100 + s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 +
+    s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d10 + s.conduct.d11 + s.conduct.d12;
 });
 // 若已上传过班级名单，则用名单覆盖内置演示学生（考勤点名/学生档案随名单变化，并跨刷新保留）
 loadRosterStudents();
 
 // 品德操行净汇总（与 PC 端一致）：各维度加分之和 - 各维度减分之和，不再以 100 为基准
 function mConductNet(s) {
-  return (s.conduct.d1 + s.conduct.d2 + s.conduct.d3 + s.conduct.d4 + s.conduct.d5 + s.conduct.d10) -
-         (s.conduct.d6 + s.conduct.d7 + s.conduct.d8 + s.conduct.d9 + s.conduct.d11 + s.conduct.d12);
+  var sum = 0;
+  MC_ALL.forEach(function(k){ sum += (+s.conduct[k] || 0); }); // 带符号直接相加：加分正、减分负
+  return sum;
 }
 // ===== 云端操行记录（保留原始行便于按周取数）+ 按周模板快照（与 PC 端共享）=====
 var _mCloudConductRows = [];
@@ -2416,7 +2417,7 @@ function applyCloudRecords() {
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-      s.conduct[r.dim] += r.score;
+      s.conduct[r.dim] += (r.score_type === '加分' ? +r.score : -r.score); // 带符号存储
       s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
     });
     try { if (typeof initConductCards==='function') initConductCards(); } catch(e){}
@@ -2428,10 +2429,10 @@ function applyCloudRecords() {
       if (!s) return;
       s.violations.unshift({ type: r.vtype, desc: r.description, score: -r.score, isBonus: false, date: r.vdate, photo: r.photo });
       s.conduct.total -= r.score;
-      s.conduct.d12 += r.score; // 云端违纪收集表扣分关联到“违纪”列
-      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 += r.score;
-      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
-      else s.conduct.d9 += r.score;
+      s.conduct.d12 -= r.score; // 云端违纪收集表扣分关联到“违纪”列（减分维度存负数）
+      if (r.vtype.indexOf('晚修') !== -1 || r.vtype.indexOf('手机') !== -1) s.conduct.d7 -= r.score;
+      else if (r.vtype.indexOf('旷课') !== -1) s.conduct.d11 -= r.score;
+      else s.conduct.d9 -= r.score;
     });
     try { if (typeof initMStudentTable==='function') initMStudentTable(); } catch(e){}
     renderReportCard();
@@ -2758,7 +2759,7 @@ function applySharedCollectRecords() {
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r) {
     var s = students.find(function(x){ return x.fullId === r.fullId; });
     if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-    s.conduct[r.dim] += r.score;
+    s.conduct[r.dim] += (r.scoreType === '加分' ? +r.score : -r.score); // 带符号存储
     s.conduct.total += (r.scoreType === '加分' ? r.score : -r.score);
   });
   loadSharedRecords(COLLECT_VIOLATION_KEY).forEach(function(r) {
@@ -2766,9 +2767,9 @@ function applySharedCollectRecords() {
     if (!s) return;
     s.violations.unshift({ type: r.type, desc: r.desc, score: -r.score, isBonus: false, date: r.date, photo: r.photo });
     s.conduct.total -= r.score;
-    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 += r.score;
-    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 += r.score;
-    else s.conduct.d9 += r.score;
+    if (r.type.indexOf('晚修') !== -1 || r.type.indexOf('手机') !== -1) s.conduct.d7 -= r.score;
+    else if (r.type.indexOf('旷课') !== -1) s.conduct.d11 -= r.score;
+    else s.conduct.d9 -= r.score;
   });
 }
 // 逐个 try/catch 隔离，防止任一同步函数抛错导致后续（含请假审批）渲染被跳过
@@ -3727,7 +3728,7 @@ function submitViolation() {
     s.conduct.d10 += viScore;
     s.conduct.total += viScore;
   } else {
-    s.conduct.d11 += viScore;
+    s.conduct.d11 -= viScore; // 违纪维度存负数
     s.conduct.total -= viScore;
   }
   hideModal('violationModal');
@@ -3850,7 +3851,7 @@ function submitCollectionForm() {
     s.conduct.d10 += cfScore;
     s.conduct.total += cfScore;
   } else {
-    s.conduct.d11 += cfScore;
+    s.conduct.d11 -= cfScore; // 违纪维度存负数
     s.conduct.total -= cfScore;
   }
   hideModal('collectionFormModal');
@@ -3945,7 +3946,7 @@ function submitCcForm() {
   if (!ccSelectedDim) { showToast('请选择录入维度'); return; }
   const s = students[parseInt(studentIdx)];
   const dimName = ccDimNames[ccSelectedDim];
-  s.conduct[ccSelectedDim] += ccScore;
+  s.conduct[ccSelectedDim] += (ccDimType === '加分' ? ccScore : -ccScore); // 带符号存储
   if (ccDimType === '加分') {
     s.conduct.total += ccScore;
   } else {
@@ -4753,13 +4754,13 @@ function submitStandaloneForm(isViolation) {
     var dateStr = dateVal ? dateVal.replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
     s.violations.push({ date: dateStr, type: typeName, desc: desc, score: -sfvScore, photo: sfvPhotoData });
     s.conduct.total -= sfvScore;
-    s.conduct.d12 += sfvScore; // 违纪收集表上传的扣分关联到“违纪”列
-    if (typeName.indexOf('晚修') !== -1 || typeName.indexOf('手机') !== -1) s.conduct.d7 += sfvScore;
-    else if (typeName.indexOf('旷课') !== -1) s.conduct.d11 += sfvScore;
-    else s.conduct.d9 += sfvScore;
+    s.conduct.d12 -= sfvScore; // 违纪收集表上传的扣分关联到“违纪”列（减分维度存负数）
+    if (typeName.indexOf('晚修') !== -1 || typeName.indexOf('手机') !== -1) s.conduct.d7 -= sfvScore;
+    else if (typeName.indexOf('旷课') !== -1) s.conduct.d11 -= sfvScore;
+    else s.conduct.d9 -= sfvScore;
   } else {
     var dim = sfvSelectedType.dim;
-    s.conduct[dim] += sfvScore;
+    s.conduct[dim] += (sfvSelectedType.scoreType === '加分' ? sfvScore : -sfvScore); // 带符号存储
     if (sfvSelectedType.scoreType === '加分') s.conduct.total += sfvScore;
     else s.conduct.total -= sfvScore;
     // 品德操行收集表：保存上传图片/备注，供学生档案“备注”区缩略图放大查看
