@@ -2355,6 +2355,8 @@ function updateAttStats() {
     if (s === 'leave') leave++;
     if (s === 'absent') absent++;
   });
+  var totalEl = document.getElementById('attTotal');
+  if (totalEl) totalEl.textContent = (students && students.length) ? students.length : 0;
   document.getElementById('attPresent').textContent = present;
   document.getElementById('attLeave').textContent = leave;
   document.getElementById('attAbsent').textContent = absent;

@@ -3181,6 +3181,8 @@ function cycleMAttendance(id) {
 function updateMAttStats() {
   let p=0,l=0,a=0;
   Object.values(mAttStates).forEach(s => { if(s==='present')p++; if(s==='leave')l++; if(s==='absent')a++; });
+  var totalEl = document.getElementById('mAttTotal');
+  if (totalEl) totalEl.textContent = (typeof students !== 'undefined' && students && students.length) ? students.length : 0;
   document.getElementById('mAttPresent').textContent = p;
   document.getElementById('mAttLeave').textContent = l;
   document.getElementById('mAttAbsent').textContent = a;
