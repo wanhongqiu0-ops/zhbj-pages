@@ -1411,6 +1411,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 480px; mar
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="font-size:13px;color:var(--text-2)">周次</span>
           <select class="form-select" id="mConductWeekSelect" style="flex: 1 1 0%; font-size: 13px; padding: 6px 10px;" onchange="mOnConductWeekChange()"></select>
+          <button class="btn btn-outline btn-sm" style="flex:0 0 auto;font-size:13px;padding:6px 10px;color:var(--danger);border-color:var(--danger);line-height:1.2" title="清空品德操行数据" onclick="mClearConduct()">🗑</button>
           <script>try{var _ws=document.getElementById('mConductWeekSelect');if(_ws){var _cw=(typeof cwWeekOfYearM==='function'?cwWeekOfYearM(new Date()):1);var _hh='<option value="">全部（累计）<\/option>';for(var _w=1;_w<=21;_w++){_hh+='<option value="'+_w+'">第'+_w+'周'+(_w===_cw?'（本周）':'')+'</option>';}_ws.innerHTML=_hh;}}catch(e){}</script>
         </div>
 
@@ -3363,6 +3364,32 @@ function mOnConductWeekChange() {
     var kanbanVisible = document.getElementById('conductKanbanMode') && document.getElementById('conductKanbanMode').style.display !== 'none';
     if (kanbanVisible) initMCharts(); else initConductCards();
   } catch(e) {}
+}
+// ===== 清空全部品德操行数据（本地 localStorage + 云端，含班级名单）=====
+function mClearConduct() {
+  if (!confirm('此操作将永久清除全部品德操行数据（含班级名单、分数、各周记录，本地+云端），且不可恢复。确定？')) return;
+  if (!confirm('再次确认：将清空云端及所有设备数据？')) return;
+  // 1) 本地 localStorage
+  try { localStorage.removeItem('smartclass_conduct_weektpl'); } catch(e){}       // 各周模板
+  try { localStorage.removeItem(COLLECT_CONDUCT_KEY); } catch(e){}                // 操行收集记录
+  try { localStorage.removeItem(COLLECT_VIOLATION_KEY); } catch(e){}              // 违纪收集/扣分记录
+  try { _mWeekTpl = null; _mCloudConductRows = []; } catch(e){}
+  try { students.length = 0; } catch(e){}                                         // 名单（含违纪回流字段 violations）一并清空
+  try { saveRosterStudents([]); } catch(e){}                                      // 名单置空并持久化
+  // 2) 云端
+  if (typeof sbEnabled === 'function' && sbEnabled()) {
+    try { sbDeleteRow('conduct_records', 'full_id=not.is.null'); } catch(e){}      // 全部收集/加分记录
+    try { sbDeleteRow('violation_records', 'full_id=not.is.null'); } catch(e){}    // 违纪收集/扣分记录
+    try { sbDeleteRow('class_settings', 'key=in.("roster","conductWeekTpl")'); } catch(e){} // 云端名单+周模板
+    try { if (typeof sbUpsert === 'function') sbUpsert('class_settings', { key:'roster', value:'[]' }, 'key'); } catch(e){} // 回写空名单
+  }
+  // 3) 重渲染当前品德操行视图为空态
+  try {
+    var kanbanVisible = document.getElementById('conductKanbanMode') && document.getElementById('conductKanbanMode').style.display !== 'none';
+    if (kanbanVisible) { if (typeof initMCharts === 'function') initMCharts(); }
+    else if (typeof initConductCards === 'function') initConductCards();
+  } catch(e){}
+  try { showToast('已清空品德操行数据'); } catch(e){}
 }
 
 let mDeductChartInstance = null;

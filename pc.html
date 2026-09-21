@@ -757,6 +757,7 @@ body.standalone-form #standaloneFormView { display: block; max-width: 560px; mar
             <button class="btn btn-default btn-sm" onclick="downloadConductTemplate()">⬇ 下载空模板</button>
             <button class="btn btn-default btn-sm" onclick="uploadConductTemplate()">⬆ 上传填写好的模板</button>
             <button class="btn btn-default btn-sm" onclick="pcRestoreConductHidden()">↩ 恢复已删行</button>
+            <button class="btn btn-default btn-sm" onclick="clearConductData()" style="border-color:var(--danger);color:var(--danger)">🗑 清空操行数据</button>
           </div>
           <div class="collect-dropdown" id="conductCollectDropdown">
             <button class="btn btn-primary btn-sm" onclick="toggleConductCollectDD(event)">📤 收集表链接 ▾</button>
@@ -2609,6 +2610,35 @@ function pcRestoreConductHidden(){
     if (currentConductWeek()) { try { renderConductWeekTable(String(currentConductWeek())); } catch(e){ } }
     else { try { initConductTable(); } catch(e){ } }
   } catch(e){ }
+}
+// ===== 清空全部品德操行数据（本地 localStorage + 云端）=====
+function clearConductData() {
+  if (!confirm('此操作将永久清除全部品德操行数据（含班级名单、分数、各周记录，本地+云端），且不可恢复。确定？')) return;
+  if (!confirm('再次确认：将清空云端及所有设备数据？')) return;
+  // 1) 本地 localStorage
+  try { localStorage.removeItem(WKTPL_KEY); } catch(e){}        // 各周模板
+  try { localStorage.removeItem(COLLECT_CONDUCT_KEY); } catch(e){} // 收集记录
+  try { localStorage.removeItem(COLLECT_VIOLATION_KEY); } catch(e){} // 违纪收集
+  try { localStorage.removeItem(CONDUCT_HIDDEN_KEY); } catch(e){} // 隐藏行
+  try { localStorage.removeItem('smartclass_pc_conduct_photos'); } catch(e){} // 照片（如存在）
+  try { students.length = 0; } catch(e){}
+  try { saveRosterStudents([]); } catch(e){} // 名单置空并持久化
+  // 2) 云端
+  if (typeof sbEnabled === 'function' && sbEnabled()) {
+    try { sbDelete('conduct_records', 'full_id=not.is.null'); } catch(e){} // 全部收集/加分记录
+    try { sbDelete('violation_records', 'full_id=not.is.null'); } catch(e){} // 云端全部违纪记录
+    try { sbDelete('class_settings', 'key=in.("roster","conductWeekTpl")'); } catch(e){} // 云端名单+周模板
+    try { if (typeof sbUpsert === 'function') sbUpsert('class_settings', { key: 'roster', value: '[]' }, 'key'); } catch(e){} // 回写空名单
+  }
+  // 3) 重渲染当前视图为空态
+  try {
+    if (typeof renderCurrentConductView === 'function') renderCurrentConductView();
+    if (typeof populateConductWeekSelect === 'function') populateConductWeekSelect();
+    if (typeof initStudentTable === 'function') initStudentTable();
+    if (typeof initConductCards === 'function') initConductCards();
+    if (typeof initKanbanCharts === 'function') initKanbanCharts();
+  } catch(e){}
+  try { showToast('已清空品德操行数据'); } catch(e){}
 }
 function initConductTable() {
   // “全部（累计）”：只读展示各周填入数据的合计（周模板快照 + 各周收集记录），不提供手动录入
