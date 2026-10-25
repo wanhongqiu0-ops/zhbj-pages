@@ -1886,6 +1886,11 @@ function applyCloudRecords() {
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
       s.conduct[r.dim] += (r.score_type === '加分' ? +r.score : -r.score);
       s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
+      if (r.description || r.photo) { // 云端收集表回传的备注/照片合入该生备注
+        if (!s.conduct.notes) s.conduct.notes = [];
+        var ndup = s.conduct.notes.some(function(n){ return n && n.img === (r.photo||'') && n.text === (r.description||''); });
+        if (!ndup) s.conduct.notes.push({ date: (r.date||r.week||''), text: (r.description||''), img: (r.photo||'') });
+      }
     });
     try { renderCurrentConductView(); if (typeof initKanbanCharts==='function') initKanbanCharts(); } catch(e){}
     populateConductWeekSelect();
@@ -2534,8 +2539,12 @@ function PcConductNoteCellHtml(s) {
     var safe = String(img).replace(/'/g, "\\'");
     return '<a href="javascript:void(0)" class="note-photo-link" onclick="showPhotoPreview(\'' + safe + '\')">' + (ph.length > 1 ? '图片' + (i + 1) : '图片') + '</a>';
   }).join('');
+  // 文本备注（手动输入 + 收集表回传的 description）在输入框下方展示
+  var texts = [];
+  try { ((s.conduct && s.conduct.notes) || []).forEach(function(n){ if (n && n.text) { var t = String(n.text).replace(/&/g, '&amp;').replace(/</g, '&lt;'); if (texts.indexOf(t) < 0) texts.push(t); } }); } catch(e){}
+  var txtHtml = texts.length ? '<div style="margin-top:2px;font-size:11px;color:var(--text-2);line-height:1.4">' + texts.map(function(t){ return '<div>· ' + t + '</div>'; }).join('') + '</div>' : '';
   var input = '<input class="cell-input note-input" value="' + note + '" placeholder="备注…" oninput="PcConductNoteEdit(\'' + s.fullId + '\',this)">';
-  return '<div class="note-cell">' + input + (links ? '<div class="note-links">' + links + '</div>' : '') + '</div>';
+  return '<div class="note-cell">' + input + txtHtml + (links ? '<div class="note-links">' + links + '</div>' : '') + '</div>';
 }
 // 备注框手动输入：写回该生本地备注并持久化到云端名单
 function PcConductNoteEdit(fid, el) {
@@ -2584,11 +2593,23 @@ function pcBindSwipeRemove(trEl, fid){
     }
   } catch(e){}
 }
-// 删除整行：写入隐藏列表 → 淡出 → 移除 DOM → 重排当前视图
+// 删除整行：写入隐藏列表（回收站存原数据可恢复）→ 从名单真实移除 → 同步本地+云端名单 → 淡出移除 DOM → 重排当前视图
 function pcMarkConductRowDel(fid, trEl){
   try {
     if (!fid || pcIsConductHidden(fid)) return;
     var arr = pcConductHidden(); arr.push(fid); pcConductHiddenSave(arr);
+    // 真实从 students 移除，并把完整对象存入回收站（供“恢复已删行”使用）
+    var idx = -1, s = null;
+    for (var i = 0; i < students.length; i++) { if (String(students[i].fullId) === String(fid)) { idx = i; s = students[i]; break; } }
+    if (s) {
+      try {
+        var bin = JSON.parse(localStorage.getItem('smartclass_pc_conduct_bin') || '{}');
+        bin[fid] = s; localStorage.setItem('smartclass_pc_conduct_bin', JSON.stringify(bin));
+      } catch(e){}
+      students.splice(idx, 1);
+      try { saveRosterStudents(students.slice()); } catch(e){}
+      try { if (typeof pushRosterCloud === 'function') pushRosterCloud(); } catch(e){} // 云端名单同步：考勤/手机端随之更新
+    }
     if (trEl) {
       try {
         trEl.style.transition = 'opacity .3s';
@@ -2596,17 +2617,34 @@ function pcMarkConductRowDel(fid, trEl){
         setTimeout(function(){ try { if (trEl.parentNode) trEl.parentNode.removeChild(trEl); } catch(e){ } }, 300);
       } catch(e){ try { if (trEl.parentNode) trEl.parentNode.removeChild(trEl); } catch(e2){ } }
     }
+    try { if (typeof updateAttStats === 'function') updateAttStats(); } catch(e){} // 同步 PC 考勤应到人数
     if (currentConductWeek()) { try { renderConductWeekTable(String(currentConductWeek())); } catch(e){ } }
     else { try { initConductTable(); } catch(e){ } }
   } catch(e){ }
 }
-// 恢复已删除行：确认后清空隐藏列表并重渲染
+// 恢复已删除行：确认后从回收站重建学生 → 同步本地+云端名单 → 清空隐藏列表并重渲染
 function pcRestoreConductHidden(){
   try {
     var arr = pcConductHidden();
     if (!arr.length) { try { showToast('当前没有隐藏/删除的操行行'); } catch(e){ } return; }
     if (!confirm('确认恢复已删除的 ' + arr.length + ' 个学生行吗？')) return;
+    var restored = 0;
+    try {
+      var bin = JSON.parse(localStorage.getItem('smartclass_pc_conduct_bin') || '{}');
+      arr.forEach(function(fid){
+        if (bin[fid]) {
+          if (!students.some(function(x){ return String(x.fullId) === String(fid); })) { students.push(bin[fid]); restored++; }
+          delete bin[fid];
+        }
+      });
+      localStorage.setItem('smartclass_pc_conduct_bin', JSON.stringify(bin));
+    } catch(e){}
     pcConductHiddenSave([]);
+    if (restored) {
+      try { saveRosterStudents(students.slice()); } catch(e){}
+      try { if (typeof pushRosterCloud === 'function') pushRosterCloud(); } catch(e){}
+      try { if (typeof updateAttStats === 'function') updateAttStats(); } catch(e){}
+    }
     if (currentConductWeek()) { try { renderConductWeekTable(String(currentConductWeek())); } catch(e){ } }
     else { try { initConductTable(); } catch(e){ } }
   } catch(e){ }
@@ -2851,6 +2889,7 @@ function initKanbanStudentCards() {
           <div class="sc-id">${s.id} · ${s.dorm}</div>
         </div>
       </div>
+      ${(function(){ var _nb = (s.conduct&&s.conduct.note)||''; var _nt = (s.conduct&&s.conduct.notes)||[]; var _tx = _nb?[_nb]:[]; _nt.forEach(function(n){ if(n&&n.text && _tx.indexOf(n.text)<0) _tx.push(n.text); }); return _tx.length ? '<div style="margin:6px 0;padding:5px 8px;background:var(--primary-light);border-radius:6px;font-size:11px;color:var(--text-2);line-height:1.4">'+_tx.slice(0,3).map(function(t){ return '<div>· '+String(t).replace(/</g,'&lt;')+'</div>'; }).join('')+'</div>' : ''; })()}
       <div class="sc-dims">
       ${dims.map(d => {
         const dv = pcKanDim(s, d.key) || 0;

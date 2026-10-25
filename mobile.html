@@ -448,6 +448,8 @@ input, textarea, select, button { font-family: inherit; font-size: inherit; outl
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+  /* 底部留白：滚动到最后的名字不被底部菜单栏/操作栏遮挡 */
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 36px);
 }
 .att-btn {
   height: 72px;
