@@ -3334,6 +3334,7 @@ function mAdjustConduct(fid, key, el) {
   if (!s) return;
   var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
   if (isNaN(v)) v = 0;
+  if (el) el.style.color = v < 0 ? 'var(--danger)' : 'var(--text-1)';
   var _wk = mCurrentWeek();
   if (_wk) {
     // 选周时：写入该周模板快照（不污染累计），并同步云端与PC端共用

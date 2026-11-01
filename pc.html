@@ -2816,6 +2816,7 @@ function PcConductWeekEdit(fid, dim, el) {
   if (!s) return;
   var v = parseFloat(String(el.value).replace(/[^\d.\-]/g, ''));
   if (isNaN(v)) v = 0; // 每个项目保留正负号，总分即各栏算术相加
+  if (el) el.style.color = v < 0 ? 'var(--danger)' : 'var(--text-1)';
   var tpl = loadWeekTpl();
   var wk = tpl[String(week)] || (tpl[String(week)] = {});
   var sn = wk[fid] || (wk[fid] = { dims: {} });
@@ -4263,6 +4264,7 @@ function pullRosterFromCloud() {
       var tag = document.getElementById('rosterStatusTag'); if (tag) tag.textContent = '已加载 ' + students.length + '人';
       try {
         initAttendance(); initStudentTable(); initConductTable();
+        try { if (typeof applyCloudNotes === 'function') applyCloudNotes(); } catch(e){}
         if (typeof initConductCards === 'function') initConductCards();
         if (typeof renderConductWeekCard === 'function') renderConductWeekCard();
       } catch(e) { console.error('rosterRerender', e); }

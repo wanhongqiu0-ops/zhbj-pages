@@ -393,13 +393,19 @@ function submitForm() {
     names.push(s.name);
     // 若配置了 Supabase，则写入云端数据库（真正跨设备回传）
     if (sbEnabled()) {
-      sbInsert('conduct_records', {
+      var row = {
         full_id: s.fullId, name: s.name, dim: dim,
         score: fpvScore, score_type: signedType,
         description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
         week: String(week),
         device: (navigator.userAgent || '').substring(0, 40)
-      });
+      };
+      sbInsert('conduct_records', row);
+      // 兜底：若当前配置连的不是默认项目，再写一份到默认项目（PC端读取的项目）
+      var _c = sbConfig();
+      if ((_c.url || '').replace(/\/+$/,'') !== SB_DEFAULT_URL.replace(/\/+$/,'') || _c.anon !== SB_DEFAULT_KEY) {
+        sbInsertDefault('conduct_records', row);
+      }
     }
   });
 
