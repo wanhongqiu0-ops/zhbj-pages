@@ -1884,8 +1884,8 @@ function applyCloudRecords() {
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-      s.conduct[r.dim] += (r.score_type === '加分' ? +r.score : -r.score);
-      s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
+      s.conduct[r.dim] += (+r.score);
+      s.conduct.total += (+r.score);
       if (r.description || r.photo) { // 云端收集表回传的备注/照片合入该生备注
         if (!s.conduct.notes) s.conduct.notes = [];
         var ndup = s.conduct.notes.some(function(n){ return n && n.img === (r.photo||'') && n.text === (r.description||''); });
@@ -2064,8 +2064,7 @@ function onKanbanWeekChange(sel) {
 function buildWeeklyMatrix(weekStr) {
   var m = {};
   function add(fid, dm, score) {
-    // 按“每列的真实正负号”计入：加分维度原样，减分维度取负（即扣分为负值），总分即各栏相加
-    if (CONDUCT_ADD_DIMS.indexOf(dm) < 0) score = -(score || 0);
+    // 按录入值本身的正负号计入（正数加分、负数扣分），不再按维度类型固定加减
     var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (score || 0);
   }
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r){
@@ -2082,8 +2081,8 @@ function applySharedCollectRecords() {
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r) {
     var s = students.find(function(x){ return x.fullId === r.fullId; });
     if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-    s.conduct[r.dim] += (r.scoreType === '加分' ? +r.score : -r.score);
-    s.conduct.total += (r.scoreType === '加分' ? r.score : -r.score);
+    s.conduct[r.dim] += (+r.score);
+    s.conduct.total += (+r.score);
     if (r && (r.note || r.desc || r.photo)) { if (!s.conduct.notes) s.conduct.notes = []; s.conduct.notes.push({ date: (r.date||r.week||''), text: (r.note||r.desc||''), img: (r.photo||'') }); }
   });
   // 违纪收集表

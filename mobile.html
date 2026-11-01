@@ -2377,8 +2377,7 @@ function mDimOf(s, k){ var wk = mCurrentWeek(); return wk ? mWeekDimVal(s, wk, k
 function mWeekMatrix(wk){
   var m = {};
   function add(fid, dm, sc){
-    // 按“每列真实正负号”计入：加分维度原样，减分维度取负（扣分为负），总分=各栏相加
-    if (MC_ADD.indexOf(dm) < 0) sc = -(sc || 0);
+    // 按录入值本身的正负号计入（正数加分、负数扣分），不再按维度类型固定加减
     var f = m[fid] || (m[fid] = {}); f[dm] = (f[dm] || 0) + (sc || 0);
   }
   try { var recs = JSON.parse(localStorage.getItem('smartclass_conduct_collect')||'[]') || []; recs.forEach(function(r){ if (r && String(r.week) === String(wk) && r.fullId && r.dim) add(r.fullId, r.dim, r.score); }); } catch(e){}
@@ -2442,8 +2441,8 @@ function applyCloudRecords() {
     (rows||[]).forEach(function(r) {
       var s = students.find(function(x){ return x.fullId === r.full_id; });
       if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-      s.conduct[r.dim] += (r.score_type === '加分' ? +r.score : -r.score); // 带符号存储
-      s.conduct.total += (r.score_type === '加分' ? r.score : -r.score);
+      s.conduct[r.dim] += (+r.score); // 带符号存储（正加负扣）
+      s.conduct.total += (+r.score);
     });
     try { if (typeof initConductCards==='function') initConductCards(); } catch(e){}
   });
@@ -2784,8 +2783,8 @@ function applySharedCollectRecords() {
   loadSharedRecords(COLLECT_CONDUCT_KEY).forEach(function(r) {
     var s = students.find(function(x){ return x.fullId === r.fullId; });
     if (!s || !r.dim || s.conduct[r.dim] === undefined) return;
-    s.conduct[r.dim] += (r.scoreType === '加分' ? +r.score : -r.score); // 带符号存储
-    s.conduct.total += (r.scoreType === '加分' ? r.score : -r.score);
+    s.conduct[r.dim] += (+r.score); // 带符号存储（正加负扣）
+    s.conduct.total += (+r.score);
   });
   loadSharedRecords(COLLECT_VIOLATION_KEY).forEach(function(r) {
     var s = students.find(function(x){ return x.fullId === r.fullId; });
@@ -4223,12 +4222,11 @@ function pushRosterCloud() {
   try { sbUpsert('class_settings', { key: 'roster', value: JSON.stringify(students) }, 'key'); } catch(e) {}
 }
 function pullRosterFromCloud() {
-  if (!sbEnabled || !sbEnabled() || typeof sbFetchWhere !== 'function') return;
-  sbFetchWhere('class_settings', 'key=eq.roster', function(rows) {
+  function mApplyRosterRows(rows) {
     try {
-      if (!rows || !rows.length) return;
+      if (!rows || !rows.length) return false;
       var arr = JSON.parse(rows[0].value || '[]');
-      if (!Array.isArray(arr) || !arr.length) return;
+      if (!Array.isArray(arr) || !arr.length) return false;
       students.length = 0; arr.forEach(function(s){ students.push(s); });
       saveRosterStudents(students);
       try {
@@ -4237,7 +4235,26 @@ function pullRosterFromCloud() {
         if (typeof initConductCards === 'function') initConductCards('home');
         if (typeof mRenderDuty === 'function') mRenderDuty('home');
       } catch(e) { console.error('rosterRerenderM', e); }
-    } catch(e) { console.error('pullRosterM', e); }
+      return true;
+    } catch(e) { console.error('pullRosterM', e); return false; }
+  }
+  // 直接按指定 URL/KEY 拉取名单（用于回退默认项目）
+  function mFetchRosterWith(url, anon, done) {
+    try {
+      fetch(url + '/rest/v1/class_settings?select=value&key=eq.roster&limit=1', {
+        headers: { 'apikey': anon, 'Authorization': 'Bearer ' + anon }
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (Array.isArray(d)) done(d); else done([]);
+      }).catch(function(){ done([]); });
+    } catch(e) { done([]); }
+  }
+  // 优先用当前配置拉；拉空则回退默认项目重试，规避 iPhone 残留旧项目 URL 导致的名单丢失
+  var c = sbConfig();
+  mFetchRosterWith(c.url || SB_DEFAULT_URL, c.anon || SB_DEFAULT_KEY, function(rows) {
+    if (mApplyRosterRows(rows)) return;
+    if ((c.url && c.url.replace(/\/+$/,'') !== SB_DEFAULT_URL.replace(/\/+$/,'')) || (c.anon !== SB_DEFAULT_KEY)) {
+      mFetchRosterWith(SB_DEFAULT_URL, SB_DEFAULT_KEY, function(rows2) { mApplyRosterRows(rows2); });
+    }
   });
 }
 function loadRosterStudents() {

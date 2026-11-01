@@ -189,16 +189,13 @@ replayCloudRecords();
 function loadCloudRoster() {
   var c = sbConfig();
   if (!c.url || !c.anon || !sbEnabled()) return;
-  fetch(c.url + '/rest/v1/class_settings?select=value&key=eq.roster&limit=1', {
-    headers: { 'apikey': c.anon, 'Authorization': 'Bearer ' + c.anon }
-  }).then(function(r){ return r.json(); }).then(function(d){
+  function applyRoster(d) {
     try {
-      if (!Array.isArray(d) || !d.length || !d[0].value) return;
+      if (!Array.isArray(d) || !d.length || !d[0].value) return false;
       var arr = JSON.parse(d[0].value || '[]');
-      if (!Array.isArray(arr) || !arr.length) return;
+      if (!Array.isArray(arr) || !arr.length) return false;
       students.length = 0;
       arr.forEach(function(s){ students.push(s); });
-      // 补齐 conduct 默认值，避免渲染/合计报错
       var dimKeys = ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'];
       students.forEach(function(s){
         if (!s.conduct) s.conduct = {};
@@ -207,10 +204,25 @@ function loadCloudRoster() {
       });
       replayCollectRecords();
       replayCloudRecords();
-      // 若表单已渲染则刷新，确保下拉立即显示新名单
       if (document.getElementById('formView') && document.getElementById('fpvStudentList')) renderForm();
-    } catch(e){ console.error('loadCloudRoster', e); }
-  }).catch(function(){});
+      return true;
+    } catch(e){ console.error('loadCloudRoster.applyRoster', e); return false; }
+  }
+  function fetchWith(url, anon, done) {
+    try {
+      fetch(url + '/rest/v1/class_settings?select=value&key=eq.roster&limit=1', {
+        headers: { 'apikey': anon, 'Authorization': 'Bearer ' + anon }
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (Array.isArray(d)) done(d); else done([]);
+      }).catch(function(){ done([]); });
+    } catch(e) { done([]); }
+  }
+  fetchWith(c.url, c.anon, function(d) {
+    if (applyRoster(d)) return;
+    if ((c.url && c.url.replace(/\/+$/,'') !== SB_DEFAULT_URL.replace(/\/+$/,'')) || (c.anon !== SB_DEFAULT_KEY)) {
+      fetchWith(SB_DEFAULT_URL, SB_DEFAULT_KEY, function(d2){ applyRoster(d2); });
+    }
+  });
 }
 
 // ========== Toast ==========
@@ -289,7 +301,7 @@ function renderForm() {
     '<div class="fpv-section"><label><span class="req">*</span>1. 选择学生（可多选）</label><div id="fpvStudentList" class="fpv-check-list">' + studentOptions + '</div><div style="font-size:11px;color:var(--text-3);margin-top:4px">可勾选一名或多名学生，提交时按所选维度与分值批量录入</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>2. 选择录入维度</label><div class="fpv-types" id="fpvTypes">' + typeHtml + '</div></div>' +
     '<div class="fpv-section"><label><span class="req">*</span>3. 填写数据</label><textarea id="fpvDesc" rows="3" placeholder="描述具体情况，如：制作黑板报获一等奖..."></textarea></div>' +
-    '<div class="fpv-section"><label>分值</label><div class="fpv-score-row"><button class="btn btn-sm" onclick="adjustScore(-1)">−</button><input type="text" id="fpvScore" value="1" readonly><button class="btn btn-sm" onclick="adjustScore(1)">+</button><span id="fpvScoreType" style="font-size:12px;color:var(--text-3);margin-left:4px">分</span></div></div>' +
+    '<div class="fpv-section"><label>分值</label><div class="fpv-score-row"><button class="btn btn-sm" type="button" onclick="adjustScore(-0.5)">−</button><input type="number" id="fpvScore" value="1" step="0.1" min="-999" max="999" oninput="onScoreInput(this)"><button class="btn btn-sm" type="button" onclick="adjustScore(0.5)">+</button><span id="fpvScoreType" style="font-size:12px;color:var(--text-3);margin-left:4px">分</span></div><div style="font-size:11px;color:var(--text-3);margin-top:4px">支持正负：填正数计入加分，填负数计入扣分（如 -1.5、0、1、2）。可手动输入，精确到小数点后1位。</div></div>' +
     '<div class="fpv-section"><label>上传图片佐证（可选）</label><div class="fpv-upload" onclick="document.getElementById(\'fpvPhotoInput\').click()"><div id="fpvUploadPlaceholder"><div style="font-size:36px">📸</div><div style="font-size:13px;color:var(--text-3);margin-top:8px">点击拍照或选择图片</div></div><img id="fpvPhotoPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px"></div><input type="file" id="fpvPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this)"></div>' +
     '<button class="fpv-submit" onclick="submitForm()">提交</button>';
 
@@ -313,9 +325,19 @@ function selectType(el, idx, typeInfo) {
   }
 }
 
+function onScoreInput(el) {
+  var v = parseFloat(el.value);
+  if (isNaN(v)) v = 0;
+  fpvScore = Math.round(v * 10) / 10; // 保留小数点后1位
+}
+
 function adjustScore(delta) {
-  fpvScore = Math.max(1, fpvScore + delta);
-  document.getElementById('fpvScore').value = fpvScore;
+  var v = (isNaN(fpvScore) ? 0 : fpvScore) + delta;
+  fpvScore = Math.round(v * 10) / 10;
+  if (fpvScore < -999) fpvScore = -999;
+  if (fpvScore > 999) fpvScore = 999;
+  var el = document.getElementById('fpvScore');
+  if (el) el.value = fpvScore;
 }
 
 function previewPhoto(input) {
@@ -353,15 +375,16 @@ function submitForm() {
     var s = students[idx];
     if (!s) return;
     s.conduct[dim] += fpvScore;
-    if (fpvSelectedType.scoreType === '加分') s.conduct.total += fpvScore;
-    else s.conduct.total -= fpvScore;
+    // 按输入的正负号决定加减：正数计加、负数计扣
+    s.conduct.total += fpvScore;
+    var signedType = fpvScore >= 0 ? '加分' : '减分';
 
     // 保存提交记录到共享存储（localStorage），触发PC/手机原型storage事件同步
     records.push({
       fullId: s.fullId,
       dim: dim,
       score: fpvScore,
-      scoreType: fpvSelectedType.scoreType,
+      scoreType: signedType,
       desc: desc,
       photo: fpvPhotoData,
       week: String(week),
@@ -372,7 +395,7 @@ function submitForm() {
     if (sbEnabled()) {
       sbInsert('conduct_records', {
         full_id: s.fullId, name: s.name, dim: dim,
-        score: fpvScore, score_type: fpvSelectedType.scoreType,
+        score: fpvScore, score_type: signedType,
         description: desc, photo: (fpvPhotoData || '').substring(0, 60000),
         week: String(week),
         device: (navigator.userAgent || '').substring(0, 40)
